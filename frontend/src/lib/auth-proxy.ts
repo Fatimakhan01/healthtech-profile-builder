@@ -9,7 +9,8 @@ type AuthEndpoint =
   | "admin-csrf"
   | "admin-login"
   | "admin-session"
-  | "admin-profiles";
+  | "admin-profiles"
+  | "admin-profile-status";
 
 const SESSION_COOKIE_NAMES = new Set(["sessionid", "csrftoken"]);
 
@@ -28,6 +29,7 @@ function getForwardedCookies(cookieHeader: string | null) {
 export async function proxyAuthRequest(
   request: Request,
   endpoint: AuthEndpoint,
+  profileId?: string,
 ): Promise<Response> {
   const backendUrl = (
     process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000/api"
@@ -55,6 +57,7 @@ export async function proxyAuthRequest(
     "admin-login",
     "admin-session",
     "admin-profiles",
+    "admin-profile-status",
   ];
   const cookies = sessionEndpoints.includes(endpoint)
     ? getForwardedCookies(request.headers.get("cookie"))
@@ -70,6 +73,13 @@ export async function proxyAuthRequest(
     headers.set("content-type", "application/json");
   }
 
+  if (endpoint === "admin-profile-status" && !/^\d+$/.test(profileId ?? "")) {
+    return Response.json(
+      { detail: "A valid profile identifier is required." },
+      { status: 400, headers: { "cache-control": "no-store" } },
+    );
+  }
+
   try {
     const upstreamPaths: Record<AuthEndpoint, string> = {
       signup: "/auth/signup/",
@@ -83,8 +93,12 @@ export async function proxyAuthRequest(
       "admin-login": "/admin/login/",
       "admin-session": "/admin/session/",
       "admin-profiles": "/admin/profiles/",
+      "admin-profile-status": "/admin/profiles/",
     };
-    const upstreamPath = upstreamPaths[endpoint];
+    const upstreamPath =
+      endpoint === "admin-profile-status"
+        ? `${upstreamPaths[endpoint]}${profileId}/status/`
+        : upstreamPaths[endpoint];
     if (typeof upstreamPath !== "string" || !upstreamPath.startsWith("/")) {
       return Response.json(
         { detail: "No valid upstream route is configured for this request." },

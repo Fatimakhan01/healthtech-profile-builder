@@ -1,11 +1,17 @@
 from django.db.models import Q
-from rest_framework import generics
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAdminUser
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .admin_serializers import AdminHealthProfileSerializer
+from .admin_serializers import (
+    AdminHealthProfileSerializer,
+    AdminProfileStatusSerializer,
+)
 from .models import HealthProfile
 
 
@@ -36,3 +42,21 @@ class AdminProfileListView(generics.ListAPIView):
                 raise ValidationError({"active": "Use 'true' or 'false'."})
             queryset = queryset.filter(is_active=normalized_active == "true")
         return queryset
+
+
+class AdminProfileStatusView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, profile_id):
+        profile = get_object_or_404(HealthProfile, pk=profile_id)
+        serializer = AdminProfileStatusSerializer(
+            profile,
+            data=request.data,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            AdminHealthProfileSerializer(serializer.instance).data,
+            status=status.HTTP_200_OK,
+        )

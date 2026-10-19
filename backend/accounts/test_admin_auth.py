@@ -42,6 +42,7 @@ class AdminSessionAuthenticationTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["user"]["email"], self.admin.email)
+        self.assertIn("csrf_token", response.data)
         self.assertNotIn("access_token", response.data)
         self.assertIn("sessionid", self.client.cookies)
         session_response = self.client.get(self.session_url)
@@ -90,21 +91,57 @@ class AdminSessionAuthenticationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_logout_requires_csrf_and_ends_admin_session(self):
-        self.assertEqual(
-            self.login("admin@example.com", "A-strong-but-not-real-password-834!").status_code,
-            status.HTTP_200_OK,
+        initial_csrf_token = self.csrf_token()
+        login_response = self.client.post(
+            self.login_url,
+            {
+                "email": "admin@example.com",
+                "password": "A-strong-but-not-real-password-834!",
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=initial_csrf_token,
         )
-        csrf_token = self.client.get(self.csrf_url).data["csrf_token"]
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        csrf_token = login_response.data["csrf_token"]
 
         blocked_response = self.client.post(self.session_url)
+        stale_token_response = self.client.post(
+            self.session_url,
+            HTTP_X_CSRFTOKEN=initial_csrf_token,
+        )
         logout_response = self.client.post(
             self.session_url,
             HTTP_X_CSRFTOKEN=csrf_token,
         )
 
         self.assertEqual(blocked_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(stale_token_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(
             self.client.get(self.session_url).status_code,
             status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.get("/api/admin/profiles/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_logout_rejects_invalid_csrf_token(self):
+        self.assertEqual(
+            self.login(
+                "admin@example.com",
+                "A-strong-but-not-real-password-834!",
+            ).status_code,
+            status.HTTP_200_OK,
+        )
+
+        response = self.client.post(
+            self.session_url,
+            HTTP_X_CSRFTOKEN="invalid-csrf-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            self.client.get(self.session_url).status_code,
+            status.HTTP_200_OK,
         )

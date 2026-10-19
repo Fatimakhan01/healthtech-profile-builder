@@ -209,10 +209,13 @@ export default function Home() {
 
   if (authLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center px-6">
-        <p className="text-sm text-zinc-600" role="status">
-          Checking your sign-in session...
-        </p>
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f8f7] px-6">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <span className="size-2.5 animate-pulse rounded-full bg-teal-600 motion-reduce:animate-none" aria-hidden="true" />
+          <p className="text-sm font-medium text-slate-600" role="status">
+            Checking your sign-in session...
+          </p>
+        </div>
       </main>
     );
   }
@@ -230,89 +233,144 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl items-center px-6 py-12">
-      <section className="w-full rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h1 className="text-3xl font-semibold tracking-tight">HealthProfile</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          {mode === "signup"
-            ? "Create a standard-user account."
-            : "Sign in to your standard-user account."}
-        </p>
+    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f8f7] px-4 py-8 sm:px-6 sm:py-12">
+      <div className="pointer-events-none absolute -left-36 top-[-9rem] -z-10 size-[28rem] rounded-full bg-teal-100/70 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-48 -right-32 -z-10 size-[32rem] rounded-full bg-cyan-100/60 blur-3xl" aria-hidden="true" />
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_28px_80px_-36px_rgba(15,57,61,0.28)] md:min-h-[38rem] md:grid-cols-[0.9fr_1.1fr]">
+        <aside className="relative hidden flex-col justify-between overflow-hidden bg-[#103f43] p-10 text-white md:flex lg:p-12">
+          <div className="pointer-events-none absolute -right-24 top-24 size-72 rounded-full border border-white/10" aria-hidden="true" />
+          <div className="pointer-events-none absolute -right-8 top-40 size-40 rounded-full border border-white/10" aria-hidden="true" />
+          <div className="relative">
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/20" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" className="size-6 text-teal-200">
+                  <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span className="text-lg font-semibold tracking-tight">HealthProfile</span>
+            </div>
+            <p className="mt-16 text-xs font-semibold uppercase tracking-[0.22em] text-teal-200">
+              Your wellness, in focus
+            </p>
+            <h2 className="mt-4 max-w-sm text-4xl font-semibold leading-tight tracking-tight lg:text-[2.75rem]">
+              A clearer picture of your wellbeing.
+            </h2>
+            <p className="mt-5 max-w-sm text-sm leading-7 text-teal-50/75">
+              Keep your health preferences and personal wellness goals together in one thoughtful space.
+            </p>
+          </div>
+          <p className="relative text-xs text-teal-100/60">
+            A personal space for your wellness information.
+          </p>
+        </aside>
 
-        <form className="mt-8 space-y-5" onSubmit={submit}>
-          {mode === "signup" && (
-            <label className="block text-sm font-medium">
-              Full name
+        <div className="flex flex-col justify-center px-6 py-9 sm:px-10 sm:py-12 lg:px-14">
+          <div className="mb-8 flex items-center gap-3 md:hidden">
+            <span className="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-teal-100" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" className="size-5">
+                <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="text-base font-semibold tracking-tight text-slate-900">HealthProfile</span>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-teal-800">
+              {mode === "signup" ? "Get started" : "Welcome back"}
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.1rem]">
+              {mode === "signup" ? "Create your account" : "Sign in to continue"}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {mode === "signup"
+                ? "Create a standard-user account."
+                : "Sign in to your standard-user account."}
+            </p>
+          </div>
+
+          <form className="mt-8 space-y-5" onSubmit={submit}>
+            {mode === "signup" && (
+              <label className="block text-sm font-medium text-slate-700">
+                Full name
+                <input
+                  autoComplete="name"
+                  className="mt-2 block min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-teal-700 focus-visible:ring-4 focus-visible:ring-teal-700/10 motion-reduce:transition-none"
+                  maxLength={150}
+                  onChange={(event) => setFullName(event.target.value)}
+                  required
+                  value={fullName}
+                />
+              </label>
+            )}
+            <label className="block text-sm font-medium text-slate-700">
+              Email
               <input
-                autoComplete="name"
-                className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2"
-                maxLength={150}
-                onChange={(event) => setFullName(event.target.value)}
+                autoComplete="email"
+                className="mt-2 block min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-teal-700 focus-visible:ring-4 focus-visible:ring-teal-700/10 motion-reduce:transition-none"
+                onChange={(event) => setEmail(event.target.value)}
                 required
-                value={fullName}
+                type="email"
+                value={email}
               />
             </label>
-          )}
-          <label className="block text-sm font-medium">
-            Email
-            <input
-              autoComplete="email"
-              className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2"
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              type="email"
-              value={email}
-            />
-          </label>
-          <label className="block text-sm font-medium">
-            Password
-            <input
-              autoComplete={
-                mode === "signup" ? "new-password" : "current-password"
-              }
-              className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </label>
-          {error && (
-            <p className="text-sm text-red-700" role="alert">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p className="text-sm text-green-800" role="status">
-              {message}
-            </p>
-          )}
-          <button
-            className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            disabled={busy}
-            type="submit"
-          >
-            {busy
-              ? "Please wait..."
-              : mode === "signup"
-                ? "Create account"
-                : "Sign in"}
-          </button>
-        </form>
+            <label className="block text-sm font-medium text-slate-700">
+              Password
+              <input
+                autoComplete={
+                  mode === "signup" ? "new-password" : "current-password"
+                }
+                className="mt-2 block min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus-visible:border-teal-700 focus-visible:ring-4 focus-visible:ring-teal-700/10 motion-reduce:transition-none"
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type="password"
+                value={password}
+              />
+            </label>
+            {error && (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800" role="alert">
+                {error}
+              </p>
+            )}
+            {message && (
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800" role="status">
+                {message}
+              </p>
+            )}
+            <button
+              className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#14575a] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#10474a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/25 disabled:cursor-not-allowed disabled:opacity-55 motion-reduce:transition-none"
+              disabled={busy}
+              type="submit"
+            >
+              {busy
+                ? "Please wait..."
+                : mode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
+          </form>
 
-        <button
-          className="mt-5 text-sm text-zinc-700 underline underline-offset-4"
-          onClick={() => {
-            setMode(mode === "signup" ? "login" : "signup");
-            setError("");
-            setMessage("");
-          }}
-          type="button"
-        >
-          {mode === "signup"
-            ? "Already have an account? Sign in"
-            : "Need an account? Sign up"}
-        </button>
+          <div className="mt-6 flex flex-col items-start gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              className="min-h-10 text-left text-sm font-medium text-teal-800 underline decoration-teal-300 underline-offset-4 transition hover:text-teal-950 focus-visible:rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/15 motion-reduce:transition-none"
+              onClick={() => {
+                setMode(mode === "signup" ? "login" : "signup");
+                setError("");
+                setMessage("");
+              }}
+              type="button"
+            >
+              {mode === "signup"
+                ? "Already have an account? Sign in"
+                : "Need an account? Sign up"}
+            </button>
+            <a
+              className="min-h-10 inline-flex items-center text-sm font-medium text-slate-500 transition hover:text-slate-800 focus-visible:rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/15 motion-reduce:transition-none"
+              href="/admin"
+            >
+              Administrator sign in
+            </a>
+          </div>
+        </div>
       </section>
     </main>
   );

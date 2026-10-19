@@ -200,24 +200,31 @@ export default function ProfileDashboard({
   }
 
   const inputClass =
-    "mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm";
-  const labelClass = "block text-sm font-medium text-zinc-800";
+    "mt-1.5 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition hover:border-slate-400 focus-visible:border-teal-700 focus-visible:ring-4 focus-visible:ring-teal-700/10 motion-reduce:transition-none";
+  const labelClass = "block text-sm font-semibold text-slate-700";
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-8 sm:px-6 lg:py-12">
+    <main className="min-h-screen bg-[#f4f8f7] px-4 py-7 sm:px-6 sm:py-10 lg:py-12">
       <div className="mx-auto max-w-4xl">
-        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-zinc-500">HealthProfile</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">
+        <header className="mb-7 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-sm sm:mb-8 sm:px-7">
+          <div className="flex items-center gap-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-800 ring-1 ring-teal-100" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" className="size-6">
+                <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">HealthProfile</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
               Your health profile
             </h1>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-1 text-sm text-slate-500">
               Signed in as {user.email}
             </p>
+            </div>
           </div>
           <button
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/15 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
             disabled={loggingOut}
             onClick={logout}
             type="button"
@@ -226,21 +233,28 @@ export default function ProfileDashboard({
           </button>
         </header>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-8">
+        <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-40px_rgba(15,57,61,0.35)]">
+          <div className="border-b border-slate-100 bg-gradient-to-r from-teal-50/80 via-white to-white px-5 py-5 sm:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.17em] text-teal-800">Your details</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Personal and wellness information</h2>
+            <p className="mt-1 text-sm text-slate-600">Keep the details you choose to share up to date.</p>
+          </div>
+          <div className="p-5 sm:p-8">
           {loading ? (
-            <p className="py-8 text-sm text-zinc-600" role="status">
+            <div className="flex items-center gap-3 py-8 text-sm font-medium text-slate-600" role="status">
+              <span className="size-2.5 animate-pulse rounded-full bg-teal-600 motion-reduce:animate-none" aria-hidden="true" />
               Loading your profile...
-            </p>
+            </div>
           ) : profileLoadFailed ? (
             <div className="py-4">
               <p
-                className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800"
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800"
                 role="alert"
               >
                 {error}
               </p>
               <button
-                className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/15 motion-reduce:transition-none"
                 onClick={() => setReloadKey((current) => current + 1)}
                 type="button"
               >
@@ -250,17 +264,14 @@ export default function ProfileDashboard({
           ) : (
             <form className="space-y-6" onSubmit={saveProfile}>
               <div>
-                <h2 className="text-lg font-semibold text-zinc-950">
-                  Personal and wellness details
-                </h2>
-                <p className="mt-1 text-sm text-zinc-600">
+                <p className="text-sm leading-6 text-slate-600">
                   Only share information you are comfortable providing.
                 </p>
               </div>
 
               {error && (
                 <p
-                  className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800"
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800"
                   role="alert"
                 >
                   {error}
@@ -268,7 +279,7 @@ export default function ProfileDashboard({
               )}
               {saveSucceeded && (
                 <p
-                  className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800"
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800"
                   role="status"
                 >
                   Changes have been saved successfully.
@@ -360,8 +371,8 @@ export default function ProfileDashboard({
                 </label>
               </div>
 
-              <fieldset className="rounded-xl border border-zinc-200 p-4 sm:p-5">
-                <legend className="px-2 text-sm font-semibold text-zinc-900">
+              <fieldset className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+                <legend className="px-2 text-sm font-semibold text-slate-800">
                   Emergency contact (optional)
                 </legend>
                 <div className="grid gap-5 sm:grid-cols-3">
@@ -406,14 +417,14 @@ export default function ProfileDashboard({
                     />
                   </label>
                 </div>
-                <p className="mt-3 text-xs text-zinc-500">
+                <p className="mt-3 text-xs leading-5 text-slate-500">
                   Enter all three details or leave all three blank.
                 </p>
               </fieldset>
 
-              <div className="flex flex-wrap items-center gap-4 border-t border-zinc-100 pt-5">
+              <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 pt-5">
                 <button
-                  className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#14575a] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#10474a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/25 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
                   disabled={saving}
                   type="submit"
                 >
@@ -425,13 +436,14 @@ export default function ProfileDashboard({
           )}
           {!loading && !profileLoadFailed && error && (
             <button
-              className="mt-4 text-sm font-medium text-zinc-700 underline"
+              className="mt-4 min-h-10 text-sm font-semibold text-teal-800 underline decoration-teal-300 underline-offset-4 focus-visible:rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/15"
               onClick={logout}
               type="button"
             >
               Return to sign in
             </button>
           )}
+          </div>
         </section>
       </div>
     </main>

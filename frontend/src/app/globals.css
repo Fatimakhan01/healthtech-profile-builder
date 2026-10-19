@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+html {
+  background: #f4f8f7;
+}
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f8f7;
+  color: #172b35;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  font-feature-settings: "ss01" on;
+}
+
+::selection {
+  background: #c9eee5;
+  color: #123c3c;
 }

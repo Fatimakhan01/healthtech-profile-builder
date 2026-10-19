@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIClient
 
 from accounts.models import User
 
@@ -8,6 +8,7 @@ from .models import HealthProfile
 
 class AdminProfileListApiTests(APITestCase):
     profiles_url = "/api/admin/profiles/"
+    status_url = "/api/admin/profiles/{}/status/"
 
     def setUp(self):
         self.admin = User.objects.create_superuser(
@@ -82,3 +83,97 @@ class AdminProfileListApiTests(APITestCase):
         response = self.client.get(self.profiles_url)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_deactivate_and_reactivate_profile_without_deleting_data(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        deactivate_response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(deactivate_response.data["is_active"])
+        profile.refresh_from_db()
+        self.assertFalse(profile.is_active)
+        self.assertTrue(profile.user.is_active)
+        self.assertTrue(
+            HealthProfile.objects.filter(pk=profile.pk).exists()
+        )
+
+        reactivate_response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": True},
+            format="json",
+        )
+
+        self.assertEqual(reactivate_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(reactivate_response.data["is_active"])
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_active)
+
+    def test_profile_status_endpoint_rejects_non_boolean_values(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": "sometimes"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_active)
+
+    def test_anonymous_and_standard_users_cannot_change_profile_status(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+        self.client.logout()
+
+        anonymous_response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+        )
+        standard_user = User.objects.get(email="alex@example.com")
+        self.client.force_login(standard_user)
+        standard_response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(anonymous_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(standard_response.status_code, status.HTTP_403_FORBIDDEN)
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_active)
+
+    def test_profile_status_mutation_requires_csrf(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.admin)
+        csrf_response = csrf_client.get("/api/admin/csrf/")
+        self.assertEqual(csrf_response.status_code, status.HTTP_200_OK)
+        csrf_token = csrf_response.data["csrf_token"]
+
+        missing_token_response = csrf_client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+        )
+        invalid_token_response = csrf_client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        valid_token_response = csrf_client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(missing_token_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(invalid_token_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(valid_token_response.status_code, status.HTTP_200_OK)

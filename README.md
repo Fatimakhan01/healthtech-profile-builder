@@ -136,9 +136,9 @@ Administrator endpoints use Django server-side sessions, not standard-user JWTs:
 1. `GET /api/admin/csrf/` to obtain a CSRF token in the JSON response and establish the CSRF cookie.
 2. `POST /api/admin/login/` with JSON `{"email":"admin@example.com","password":"<local password>"}`, the CSRF cookie, and the returned token in the `X-CSRFToken` header. Successful login establishes an HttpOnly server-side session cookie; the response contains only user ID, email, and role.
 3. `GET /api/admin/session/` to check the current admin session.
-4. `POST /api/admin/session/` with the CSRF cookie and `X-CSRFToken` header to log out and invalidate the server-side session.
+4. `POST /api/admin/session/` with the CSRF cookie and `X-CSRFToken` header to log out and invalidate the server-side session. Login rotates Django's CSRF secret, so use the `csrf_token` returned by the successful login response for later state-changing requests.
 
-The CSRF endpoint returns `{"csrf_token":"<token>"}`. Admin login returns `{"user":{"id":1,"email":"admin@example.com","role":"admin"}}`; the session endpoint has the same user shape. Invalid credentials return `401`; an anonymous or ordinary account is denied admin-only routes. Session-changing requests require CSRF validation. In production, secure session and CSRF cookies are enabled when `DEBUG` is false; both cookies use `SameSite=Lax`.
+The CSRF endpoint returns `{"csrf_token":"<token>"}`. Admin login returns `{"user":{"id":1,"email":"admin@example.com","role":"admin"},"csrf_token":"<rotated-token>"}`; the session endpoint has the same user shape. Invalid credentials return `401`; an anonymous or ordinary account is denied admin-only routes. Session-changing requests require CSRF validation. In production, secure session and CSRF cookies are enabled when `DEBUG` is false; both cookies use `SameSite=Lax`.
 
 Create an administrator locally using Django's supported interactive command from the backend directory, after setting the database and Django environment:
 
@@ -148,7 +148,7 @@ Create an administrator locally using Django's supported interactive command fro
 
 Enter the administrator email and password only at the interactive prompts. Do not create default credentials or send secrets through commands, source control, or chat.
 
-The admin UI is available at `/admin`. Its session-protected profile table calls `GET /api/admin/profiles/`, which is restricted to Django staff users and supports `search` (profile full name or account email), `active=true|false`, and page-number pagination with a default of 10 rows (maximum `page_size` 50). Example: `/api/admin/profiles/?search=alex&active=true&page=1&page_size=10`. The response follows DRF pagination (`count`, `next`, `previous`, and `results`). The admin UI bootstraps CSRF and checks the existing session before requesting profiles; login and logout use the existing CSRF-protected session endpoints.
+The admin UI is available at `/admin`. Its session-protected profile table calls `GET /api/admin/profiles/`, which is restricted to Django staff users and supports `search` (profile full name or account email), `active=true|false`, and page-number pagination with a default of 10 rows (maximum `page_size` 50). Example: `/api/admin/profiles/?search=alex&active=true&page=1&page_size=10`. The response follows DRF pagination (`count`, `next`, `previous`, and `results`). Staff users can change only a profile's active flag through `PATCH /api/admin/profiles/<profile_id>/status/` with `{"is_active":false}` or `{"is_active":true}`; this retains the account and profile data and requires the existing Django session and CSRF token. The admin UI asks for confirmation before deactivation. The admin UI bootstraps CSRF and checks the existing session before requesting profiles; login and logout use the existing CSRF-protected session endpoints.
 
 ## Database schema
 

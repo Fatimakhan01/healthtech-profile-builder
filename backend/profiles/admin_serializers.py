@@ -26,3 +26,9 @@ class AdminHealthProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+
+class AdminProfileStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HealthProfile
+        fields = ("is_active",)

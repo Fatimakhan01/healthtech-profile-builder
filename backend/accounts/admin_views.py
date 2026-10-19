@@ -41,7 +41,10 @@ class AdminLoginView(APIView):
 
         login(request, user)
         return Response(
-            {"user": {"id": user.pk, "email": user.email, "role": user.role}}
+            {
+                "user": {"id": user.pk, "email": user.email, "role": user.role},
+                "csrf_token": get_token(request),
+            }
         )
 
 
