@@ -124,6 +124,8 @@ X-CSRFToken: <csrf-token>
 
 A successful login returns a safe `user` object and a newly rotated `csrf_token`; use the returned token for later state-changing admin requests. Django sets the HttpOnly server-side session cookie. Invalid credentials return `401`; missing/invalid CSRF is rejected with `403`. Session checks return `{"user":{"id":1,"email":"admin@example.test","role":"admin"}}`. An anonymous or non-staff account cannot use protected admin routes. Successful logout returns `204` and invalidates the server-side session.
 
+Admin sessions expire after 8 hours, set explicitly at successful admin login. This shorter staff-session lifetime limits exposure from an unattended privileged browser session; regular standard-user sessions retain the 14-day Django default. Both use server-side Django sessions, and `SESSION_EXPIRE_AT_BROWSER_CLOSE` remains false. The expiration is enforced by the server-side session store, not merely by the browser cookie.
+
 Create an administrator interactively from `backend/`:
 
 ```powershell

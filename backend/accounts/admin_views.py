@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
@@ -40,6 +41,7 @@ class AdminLoginView(APIView):
             )
 
         login(request, user)
+        request.session.set_expiry(settings.ADMIN_SESSION_AGE)
         return Response(
             {
                 "user": {"id": user.pk, "email": user.email, "role": user.role},

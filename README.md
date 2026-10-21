@@ -9,7 +9,7 @@ HealthProfile is a full-stack assignment foundation with a TypeScript/Next.js fr
 - `backend/profiles/` — one-to-one health profile schema.
 - `backend/` — Django project and pinned Python dependencies.
 - `backend/.venv/` — local Python virtual environment (not tracked by Git).
-- `docs/` — API/authentication reference, schema/constraint diagram, AI-workflow evidence, and submission checklist.
+- `docs/` — API/authentication reference, schema/constraint diagram, and AI-workflow evidence.
 - `.env.example` — names of local settings to configure; it contains placeholders, not credentials.
 
 ## Implemented features
@@ -81,6 +81,22 @@ Pop-Location
 
 The database must already exist and the PostgreSQL environment variables above must refer to a working login before running migrations. Create an administrator interactively after migrations with `Push-Location backend; & .\.venv\Scripts\python.exe manage.py createsuperuser; Pop-Location`; enter its email and password only at Django's prompts.
 
+### Create fictional demo profiles
+
+After migrations, run this command from the `backend/` directory to create three fictional standard-user profiles:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py create_demo_profiles
+```
+
+The demo identities use reserved `.example.test` email addresses and have unusable passwords, so the command does not print or assign login credentials. It is safe to rerun: existing matching email addresses are skipped and their user/profile data is left unchanged. It does not create staff accounts or run as part of migrations or automated test setup.
+
+Verify the demo user and profile counts from the same directory:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py shell -c "from accounts.models import User; from profiles.models import HealthProfile; print('demo users:', User.objects.filter(email__startswith='demo.member.', email__endswith='@example.test').count()); print('demo profiles:', HealthProfile.objects.filter(user__email__startswith='demo.member.', user__email__endswith='@example.test').count())"
+```
+
 In a separate PowerShell terminal, install frontend dependencies and run Next.js:
 
 ```powershell
@@ -104,6 +120,8 @@ The frontend is normally served at `http://localhost:3000`; Django's development
 | Environment loading | python-dotenv 1.2.4 loads the repository-root `.env` |
 
 The browser calls same-origin Next.js route handlers. Those handlers proxy to Django and narrowly forward the authentication cookies and headers needed by each route. Frontend and backend dependencies are managed separately in `frontend/package-lock.json` and `backend/requirements.txt`.
+
+Standard-user sessions use Django's 14-day default lifetime to restore a fresh five-minute in-memory access JWT after reload. Staff/admin sessions use an explicit 8-hour server-side expiry, shortening the exposure window for privileged sessions; both remain HttpOnly-cookie and CSRF protected.
 
 ## Standard-user authentication
 
@@ -205,7 +223,7 @@ Each user may have one `profiles.HealthProfile`; deleting a user cascades to tha
 
 Initial migrations are in `backend/accounts/migrations/` and `backend/profiles/migrations/`. They define schema only; run them only after verifying the configured PostgreSQL database and credentials. On 2026-10-19, read-only inspection connected to the configured PostgreSQL 18.4 database, found the user/profile tables and documented constraints/indexes, and showed all migrations applied. A fresh setup must provision its own database and apply migrations.
 
-See [docs/api-authentication.md](./docs/api-authentication.md) for full Django and browser-proxy API contracts, [docs/database-er-diagram.md](./docs/database-er-diagram.md) for the ER diagram and verified schema/index details, [docs/ai-workflow.md](./docs/ai-workflow.md) for evidence-based AI workflow notes, and [docs/submission-checklist.md](./docs/submission-checklist.md) for submission status and remaining tasks. The formal original assignment brief was not located in the repository, so the checklist does not claim a verified rubric mapping.
+See [docs/api-authentication.md](./docs/api-authentication.md) for full Django and browser-proxy API contracts, [docs/database-er-diagram.md](./docs/database-er-diagram.md) for the ER diagram and verified schema/index details, and [docs/ai-workflow.md](./docs/ai-workflow.md) for evidence-based AI workflow notes. The formal original assignment brief was not located in the repository; confirm submission requirements against the official rubric.
 
 ## Verify
 

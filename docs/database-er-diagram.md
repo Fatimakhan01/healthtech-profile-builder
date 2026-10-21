@@ -56,3 +56,25 @@ Age is represented by the optional `age_range` choices, not a precise date of bi
 | `profiles_active_created_idx` | `profiles_healthprofile(is_active, created_at DESC)` | No | Declared in `profiles.0001_initial`; supports admin listing by status and creation recency. |
 
 PostgreSQL catalog inspection confirmed the named unique indexes, foreign key, and profile index in the configured database during the date above. The two auto-generated Django table names shown for the user foreign key and one-to-one index come from that database; Django's migration/model semantics are the durable definition.
+
+## Admin profile-list EXPLAIN evidence
+
+The following is the recorded PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)` result for the active-profile listing, ordered by newest `created_at` and limited to 10 rows. It was captured against the configured PostgreSQL database on 2026-10-21:
+
+```text
+Limit (actual time=0.592..0.594 rows=6)
+  -> Sort (actual time=0.592..0.593 rows=6)
+       Sort Key: profiles_healthprofile.created_at DESC
+       Sort Method: quicksort  Memory: 27kB
+       -> Hash Join (actual time=0.067..0.071 rows=6)
+            -> Seq Scan on accounts_user (actual time=0.020..0.021 rows=7)
+            -> Hash
+                 -> Seq Scan on profiles_healthprofile
+                      Filter: is_active
+                      (actual time=0.015..0.017 rows=6)
+Planning Time: 12.482 ms
+Execution Time: 0.911 ms
+Buffers: shared hit=5
+```
+
+This run returned six active profiles. PostgreSQL scanned the small user and profile tables, joined them with a hash join, and sorted the qualifying profiles in memory before applying the limit. For a dataset this small, sequential scans and a tiny in-memory sort are reasonable and can cost less than using an index. Although `profiles_active_created_idx` is declared for status and creation ordering, this plan did **not** use it. These timings and planner choices describe only this small dataset and one run; they do not establish performance or index use at larger scale.

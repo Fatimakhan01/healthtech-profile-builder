@@ -1,3 +1,4 @@
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
@@ -31,6 +32,14 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["full_name"], "Example Owner")
         self.assertEqual(response.data["contact_preference"], "email")
+        self.assertEqual(
+            parse_datetime(response.data["created_at"]),
+            self.profile.created_at,
+        )
+        self.assertEqual(
+            parse_datetime(response.data["updated_at"]),
+            self.profile.updated_at,
+        )
         self.assertNotIn("user", response.data)
         self.assertNotIn("is_active", response.data)
         self.assertNotIn("password", response.data)
@@ -48,6 +57,14 @@ class CurrentHealthProfileApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.profile.refresh_from_db()
+        self.assertEqual(
+            parse_datetime(response.data["created_at"]),
+            self.profile.created_at,
+        )
+        self.assertEqual(
+            parse_datetime(response.data["updated_at"]),
+            self.profile.updated_at,
+        )
         self.assertEqual(self.profile.full_name, "Updated Owner")
         self.assertEqual(self.profile.age_range, "25_34")
         self.assertEqual(self.profile.wellness_goals, "Improve daily activity")
@@ -81,6 +98,7 @@ class CurrentHealthProfileApiTests(APITestCase):
             {"user": self.user.pk},
             {"is_active": False},
             {"created_at": "2020-01-01T00:00:00Z"},
+            {"updated_at": "2020-01-01T00:00:00Z"},
         ):
             with self.subTest(payload=payload):
                 response = self.client.patch(

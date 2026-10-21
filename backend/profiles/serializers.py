@@ -18,11 +18,19 @@ class HealthProfileSerializer(serializers.ModelSerializer):
             "emergency_contact_relationship",
             "emergency_contact_phone",
             "lifestyle_notes",
+            "created_at",
+            "updated_at",
         )
+        read_only_fields = ("created_at", "updated_at")
 
     def to_internal_value(self, data):
         if isinstance(data, Mapping):
-            unexpected_fields = set(data) - set(self.fields)
+            writable_fields = {
+                field_name
+                for field_name, field in self.fields.items()
+                if not field.read_only
+            }
+            unexpected_fields = set(data) - writable_fields
             if unexpected_fields:
                 raise serializers.ValidationError(
                     {"detail": "Only health profile fields may be updated."}

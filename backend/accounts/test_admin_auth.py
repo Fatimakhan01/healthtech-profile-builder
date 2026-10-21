@@ -1,3 +1,8 @@
+from datetime import timedelta
+
+from django.conf import settings
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
@@ -47,6 +52,43 @@ class AdminSessionAuthenticationTests(APITestCase):
         self.assertIn("sessionid", self.client.cookies)
         session_response = self.client.get(self.session_url)
         self.assertEqual(session_response.status_code, status.HTTP_200_OK)
+
+    def test_admin_session_has_explicit_eight_hour_server_expiry(self):
+        response = self.login(
+            "ADMIN@EXAMPLE.COM",
+            "A-strong-but-not-real-password-834!",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session_key = self.client.cookies["sessionid"].value
+        session = Session.objects.get(session_key=session_key)
+        expected_expiry = timezone.now() + timedelta(
+            seconds=settings.ADMIN_SESSION_AGE
+        )
+
+        self.assertEqual(settings.ADMIN_SESSION_AGE, 8 * 60 * 60)
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 14 * 24 * 60 * 60)
+        self.assertFalse(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)
+        self.assertAlmostEqual(
+            session.expire_date.timestamp(),
+            expected_expiry.timestamp(),
+            delta=5,
+        )
+
+    def test_expired_server_side_admin_session_is_denied(self):
+        response = self.login(
+            "ADMIN@EXAMPLE.COM",
+            "A-strong-but-not-real-password-834!",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        session_key = self.client.cookies["sessionid"].value
+        Session.objects.filter(session_key=session_key).update(
+            expire_date=timezone.now() - timedelta(seconds=1)
+        )
+
+        session_response = self.client.get(self.session_url)
+
+        self.assertEqual(session_response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_admin_login_rejects_invalid_credentials(self):
         response = self.login("admin@example.com", "incorrect-password")
@@ -103,6 +145,7 @@ class AdminSessionAuthenticationTests(APITestCase):
         )
         self.assertEqual(login_response.status_code, status.HTTP_200_OK)
         csrf_token = login_response.data["csrf_token"]
+        session_key = self.client.cookies["sessionid"].value
 
         blocked_response = self.client.post(self.session_url)
         stale_token_response = self.client.post(
@@ -117,6 +160,9 @@ class AdminSessionAuthenticationTests(APITestCase):
         self.assertEqual(blocked_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(stale_token_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            Session.objects.filter(session_key=session_key).exists()
+        )
         self.assertEqual(
             self.client.get(self.session_url).status_code,
             status.HTTP_403_FORBIDDEN,
