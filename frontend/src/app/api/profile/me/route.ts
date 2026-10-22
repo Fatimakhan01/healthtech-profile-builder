@@ -7,3 +7,11 @@ export function GET(request: Request) {
 export function PATCH(request: Request) {
   return proxyAuthRequest(request, "profile");
 }
+
+export function POST(request: Request) {
+  return proxyAuthRequest(request, "profile");
+}
+
+export function DELETE(request: Request) {
+  return proxyAuthRequest(request, "profile");
+}

@@ -6,11 +6,14 @@ from .models import HealthProfile
 
 
 class HealthProfileSerializer(serializers.ModelSerializer):
+    is_complete = serializers.SerializerMethodField()
+
     class Meta:
         model = HealthProfile
         fields = (
             "full_name",
             "age_range",
+            "is_complete",
             "contact_preference",
             "wellness_goals",
             "allergies",
@@ -23,6 +26,12 @@ class HealthProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("created_at", "updated_at")
 
+    def get_is_complete(self, obj):
+        return bool(
+            obj.full_name.strip()
+            and obj.age_range in HealthProfile.AgeRange.values
+        )
+
     def to_internal_value(self, data):
         if isinstance(data, Mapping):
             writable_fields = {
@@ -30,6 +39,7 @@ class HealthProfileSerializer(serializers.ModelSerializer):
                 for field_name, field in self.fields.items()
                 if not field.read_only
             }
+            writable_fields.add("is_complete")
             unexpected_fields = set(data) - writable_fields
             if unexpected_fields:
                 raise serializers.ValidationError(

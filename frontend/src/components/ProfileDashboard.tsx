@@ -69,12 +69,14 @@ export default function ProfileDashboard({
 }: Props) {
   const [profile, setProfile] = useState<HealthProfile>(emptyProfile);
   const [loading, setLoading] = useState(true);
+  const [profileExists, setProfileExists] = useState(false);
   const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
-  const [saveSucceeded, setSaveSucceeded] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -105,11 +107,19 @@ export default function ProfileDashboard({
           onSessionExpired();
           return;
         }
+        if (response.status === 404) {
+          if (active) {
+            setProfile(emptyProfile);
+            setProfileExists(false);
+          }
+          return;
+        }
         if (!response.ok) {
           throw new Error(errorMessage(payload as ApiError));
         }
         if (active) {
           setProfile(payload as HealthProfile);
+          setProfileExists(true);
         }
       } catch (requestError) {
         if (active) {
@@ -141,16 +151,26 @@ export default function ProfileDashboard({
     event.preventDefault();
     setSaving(true);
     setError("");
-    setSaveSucceeded(false);
+    setSuccessMessage("");
 
     try {
       const requestOptions: RequestInit = {
-        method: "PATCH",
+        method: profileExists ? "PATCH" : "POST",
         headers: {
           authorization: `Bearer ${accessToken}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({
+          full_name: profile.full_name,
+          age_range: profile.age_range,
+          contact_preference: profile.contact_preference,
+          wellness_goals: profile.wellness_goals,
+          allergies: profile.allergies,
+          emergency_contact_name: profile.emergency_contact_name,
+          emergency_contact_relationship: profile.emergency_contact_relationship,
+          emergency_contact_phone: profile.emergency_contact_phone,
+          lifestyle_notes: profile.lifestyle_notes,
+        }),
       };
       let response = await fetch("/api/profile/me/", requestOptions);
       if (response.status === 401) {
@@ -171,13 +191,28 @@ export default function ProfileDashboard({
         onSessionExpired();
         return;
       }
+      if (response.status === 404 && profileExists) {
+        setProfileExists(false);
+        setError("Your profile no longer exists. Submit again to create it.");
+        return;
+      }
+      if (response.status === 409) {
+        setProfileLoadFailed(true);
+        setError("A profile already exists. Reload your profile to continue.");
+        return;
+      }
       if (!response.ok) {
         setError(errorMessage(payload as ApiError));
         return;
       }
 
       setProfile(payload as HealthProfile);
-      setSaveSucceeded(true);
+      setProfileExists(true);
+      setSuccessMessage(
+        profileExists
+          ? "Changes have been saved successfully."
+          : "Your profile has been created.",
+      );
     } catch {
       setError("Could not reach the profile service. Please try again.");
     } finally {
@@ -185,10 +220,60 @@ export default function ProfileDashboard({
     }
   }
 
+  async function deleteProfile() {
+    if (!profileExists || !window.confirm("Delete your health profile? Your account will remain active.")) {
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+    setSuccessMessage("");
+    try {
+      const requestOptions: RequestInit = {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${accessToken}` },
+      };
+      let response = await fetch("/api/profile/me/", requestOptions);
+      if (response.status === 401) {
+        const refreshedToken = await refreshAccessToken();
+        if (!refreshedToken) {
+          onSessionExpired();
+          return;
+        }
+        requestOptions.headers = { authorization: `Bearer ${refreshedToken}` };
+        response = await fetch("/api/profile/me/", requestOptions);
+      }
+
+      if (response.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      if (response.status === 404) {
+        setProfile(emptyProfile);
+        setProfileExists(false);
+        setSuccessMessage("Your profile was already deleted. Your account remains active.");
+        return;
+      }
+      if (!response.ok) {
+        const payload = (await response.json()) as ApiError;
+        setError(errorMessage(payload));
+        return;
+      }
+
+      setProfile(emptyProfile);
+      setProfileExists(false);
+      setSuccessMessage("Your profile was deleted. Your account remains active.");
+    } catch {
+      setError("Could not reach the profile service. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function logout() {
     setLoggingOut(true);
     setError("");
-    setSaveSucceeded(false);
+    setSuccessMessage("");
     try {
       const loggedOut = await onLogout();
       if (!loggedOut) {
@@ -265,7 +350,9 @@ export default function ProfileDashboard({
             <form className="space-y-6" onSubmit={saveProfile}>
               <div>
                 <p className="text-sm leading-6 text-slate-600">
-                  Only share information you are comfortable providing.
+                  {profileExists
+                    ? "Only share information you are comfortable providing."
+                    : "You do not have a profile yet. Complete the fields below to create one. Your account remains active."}
                 </p>
               </div>
 
@@ -277,12 +364,12 @@ export default function ProfileDashboard({
                   {error}
                 </p>
               )}
-              {saveSucceeded && (
+              {successMessage && (
                 <p
                   className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800"
                   role="status"
                 >
-                  Changes have been saved successfully.
+                  {successMessage}
                 </p>
               )}
 
@@ -425,12 +512,27 @@ export default function ProfileDashboard({
               <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 pt-5">
                 <button
                   className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#14575a] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#10474a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-700/25 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
-                  disabled={saving}
+                  disabled={saving || deleting}
                   type="submit"
                 >
-                  {saving ? "Saving..." : "Save changes"}
+                  {saving
+                    ? profileExists
+                      ? "Saving..."
+                      : "Creating..."
+                    : profileExists
+                      ? "Save changes"
+                      : "Create profile"}
                 </button>
-                
+                {profileExists && (
+                  <button
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl border border-rose-300 bg-white px-6 py-3 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-700/15 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+                    disabled={saving || deleting}
+                    onClick={deleteProfile}
+                    type="button"
+                  >
+                    {deleting ? "Deleting..." : "Delete profile"}
+                  </button>
+                )}
               </div>
             </form>
           )}

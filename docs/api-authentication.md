@@ -59,6 +59,8 @@ Refresh obtains a new short-lived JWT from the Django session; it is not a JWT r
 
 ## Standard-user health profile API
 
+The authenticated Django endpoint `POST /api/profiles/me/` recreates a missing profile for the current standard user. Send the normal profile fields, including required `full_name`; success returns `201` with the created profile. If the user already has a profile, it returns `409` without changing it. `DELETE /api/profiles/me/` deletes only the current user's profile and returns `204`; it does not delete the user account. If a profile is absent, `GET`, `PATCH`, and `DELETE` return `404`. The existing same-origin Next.js profile proxy exposes only `GET` and `PATCH`, so use the authenticated Django API for delete and recreation.
+
 Both browser routes are same-origin Next.js proxies to Django `/api/profiles/me/`.
 
 | Method and route | Purpose | Authentication |

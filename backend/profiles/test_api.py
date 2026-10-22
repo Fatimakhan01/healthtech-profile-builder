@@ -31,6 +31,7 @@ class CurrentHealthProfileApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["full_name"], "Example Owner")
+        self.assertFalse(response.data["is_complete"])
         self.assertEqual(response.data["contact_preference"], "email")
         self.assertEqual(
             parse_datetime(response.data["created_at"]),
@@ -43,6 +44,35 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertNotIn("user", response.data)
         self.assertNotIn("is_active", response.data)
         self.assertNotIn("password", response.data)
+
+    def test_complete_profile_is_reported_as_complete(self):
+        response = self.client.patch(
+            self.profile_url,
+            {"age_range": "25_34"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_complete"])
+
+    def test_blank_full_name_is_reported_as_incomplete(self):
+        self.profile.full_name = " "
+        self.profile.save(update_fields=["full_name"])
+
+        response = self.client.get(self.profile_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_complete"])
+
+    def test_prefer_not_to_say_age_range_counts_as_complete(self):
+        response = self.client.patch(
+            self.profile_url,
+            {"age_range": HealthProfile.AgeRange.PREFER_NOT_TO_SAY},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_complete"])
 
     def test_current_user_can_update_permitted_profile_fields(self):
         response = self.client.patch(
@@ -68,6 +98,23 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertEqual(self.profile.full_name, "Updated Owner")
         self.assertEqual(self.profile.age_range, "25_34")
         self.assertEqual(self.profile.wellness_goals, "Improve daily activity")
+
+    def test_patch_ignores_returned_completion_field_without_allowing_override(self):
+        response = self.client.patch(
+            self.profile_url,
+            {
+                "full_name": "Updated Owner",
+                "age_range": "25_34",
+                "is_complete": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_complete"])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.full_name, "Updated Owner")
+        self.assertEqual(self.profile.age_range, "25_34")
 
     def test_invalid_profile_choices_and_phone_are_rejected(self):
         for payload in (
@@ -96,6 +143,7 @@ class CurrentHealthProfileApiTests(APITestCase):
     def test_protected_profile_fields_are_rejected(self):
         for payload in (
             {"user": self.user.pk},
+            {"role": "admin"},
             {"is_active": False},
             {"created_at": "2020-01-01T00:00:00Z"},
             {"updated_at": "2020-01-01T00:00:00Z"},
@@ -118,6 +166,79 @@ class CurrentHealthProfileApiTests(APITestCase):
         response = self.client.get(self.profile_url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_user_can_delete_own_profile_without_deleting_account(self):
+        response = self.client.delete(self.profile_url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(HealthProfile.objects.filter(pk=self.profile.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+        missing_response = self.client.delete(self.profile_url)
+
+        self.assertEqual(missing_response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_unauthenticated_user_cannot_delete_profile(self):
+        self.client.credentials()
+
+        response = self.client.delete(self.profile_url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertTrue(HealthProfile.objects.filter(pk=self.profile.pk).exists())
+
+    def test_delete_cannot_target_another_users_profile(self):
+        owner_profile_id = self.profile.pk
+        other_user = User.objects.create_user(
+            email="other@example.com",
+            password="A-strong-but-not-real-password-834!",
+        )
+        self.authenticate_as(other_user)
+
+        response = self.client.delete(
+            f"{self.profile_url}?profile_id={owner_profile_id}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(
+            HealthProfile.objects.filter(pk=owner_profile_id, user=self.user).exists()
+        )
+        self.assertTrue(User.objects.filter(pk=other_user.pk).exists())
+
+    def test_user_can_recreate_deleted_profile(self):
+        self.client.delete(self.profile_url)
+
+        response = self.client.post(
+            self.profile_url,
+            {
+                "full_name": "Recreated Owner",
+                "age_range": "25_34",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["full_name"], "Recreated Owner")
+        self.assertTrue(response.data["is_complete"])
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        self.assertTrue(
+            HealthProfile.objects.filter(
+                user=self.user,
+                full_name="Recreated Owner",
+            ).exists()
+        )
+
+    def test_recreate_is_rejected_when_profile_already_exists(self):
+        response = self.client.post(
+            self.profile_url,
+            {"full_name": "Duplicate Owner"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            HealthProfile.objects.filter(user=self.user).count(),
+            1,
+        )
 
     def test_profile_routes_are_scoped_to_the_authenticated_user(self):
         other_user = User.objects.create_user(
