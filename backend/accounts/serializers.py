@@ -6,7 +6,7 @@ from django.db import IntegrityError, transaction
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
-from profiles.models import HealthProfile
+from profiles.models import HealthProfile, ProfileAuditEvent
 
 from .managers import normalize_email
 from .models import User
@@ -61,9 +61,14 @@ class SignupSerializer(serializers.Serializer):
                     email=validated_data["email"],
                     password=validated_data["password"],
                 )
-                HealthProfile.objects.create(
+                profile = HealthProfile.objects.create(
                     user=user,
                     full_name=validated_data["full_name"],
+                )
+                ProfileAuditEvent.objects.create(
+                    actor=user,
+                    action=ProfileAuditEvent.Action.CREATED,
+                    profile_id=profile.pk,
                 )
         except IntegrityError as error:
             if User.objects.filter(email__iexact=validated_data["email"]).exists():

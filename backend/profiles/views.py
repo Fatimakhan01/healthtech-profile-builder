@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from accounts.permissions import IsStandardUser
 
-from .models import HealthProfile
+from .models import HealthProfile, ProfileAuditEvent
 from .serializers import HealthProfileSerializer
 
 
@@ -37,6 +37,11 @@ class CurrentHealthProfileView(generics.RetrieveUpdateDestroyAPIView):
         try:
             with transaction.atomic():
                 profile = serializer.save(user=request.user)
+                ProfileAuditEvent.objects.create(
+                    actor=request.user,
+                    action=ProfileAuditEvent.Action.CREATED,
+                    profile_id=profile.pk,
+                )
         except IntegrityError:
             if HealthProfile.objects.filter(user=request.user).exists():
                 return Response(
@@ -49,3 +54,22 @@ class CurrentHealthProfileView(generics.RetrieveUpdateDestroyAPIView):
             self.get_serializer(profile).data,
             status=status.HTTP_201_CREATED,
         )
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            profile = serializer.save()
+            ProfileAuditEvent.objects.create(
+                actor=self.request.user,
+                action=ProfileAuditEvent.Action.UPDATED,
+                profile_id=profile.pk,
+            )
+
+    def perform_destroy(self, instance):
+        profile_id = instance.pk
+        with transaction.atomic():
+            instance.delete()
+            ProfileAuditEvent.objects.create(
+                actor=self.request.user,
+                action=ProfileAuditEvent.Action.DELETED,
+                profile_id=profile_id,
+            )

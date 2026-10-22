@@ -3,7 +3,7 @@ from rest_framework.test import APITestCase, APIClient
 
 from accounts.models import User
 
-from .models import HealthProfile
+from .models import HealthProfile, ProfileAuditEvent
 
 
 class AdminProfileListApiTests(APITestCase):
@@ -61,6 +61,30 @@ class AdminProfileListApiTests(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertFalse(response.data["results"][0]["is_active"])
 
+    def test_search_status_filter_and_pagination_work_together(self):
+        first_page = self.client.get(
+            f"{self.profiles_url}?search=Example&active=true&page=1&page_size=1"
+        )
+        second_page = self.client.get(
+            f"{self.profiles_url}?search=Example&active=true&page=2&page_size=1"
+        )
+
+        self.assertEqual(first_page.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_page.data["count"], 2)
+        self.assertEqual(len(first_page.data["results"]), 1)
+        self.assertIsNotNone(first_page.data["next"])
+        self.assertTrue(first_page.data["results"][0]["is_active"])
+
+        self.assertEqual(second_page.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_page.data["count"], 2)
+        self.assertEqual(len(second_page.data["results"]), 1)
+        self.assertIsNotNone(second_page.data["previous"])
+        self.assertTrue(second_page.data["results"][0]["is_active"])
+        self.assertNotEqual(
+            first_page.data["results"][0]["id"],
+            second_page.data["results"][0]["id"],
+        )
+
     def test_invalid_active_filter_is_rejected(self):
         response = self.client.get(f"{self.profiles_url}?active=sometimes")
 
@@ -112,6 +136,16 @@ class AdminProfileListApiTests(APITestCase):
         self.assertTrue(reactivate_response.data["is_active"])
         profile.refresh_from_db()
         self.assertTrue(profile.is_active)
+        events = list(ProfileAuditEvent.objects.order_by("created_at"))
+        self.assertEqual(
+            [event.action for event in events],
+            [
+                ProfileAuditEvent.Action.DEACTIVATED,
+                ProfileAuditEvent.Action.REACTIVATED,
+            ],
+        )
+        self.assertTrue(all(event.actor == self.admin for event in events))
+        self.assertTrue(all(event.profile_id == profile.pk for event in events))
 
     def test_profile_status_endpoint_rejects_non_boolean_values(self):
         profile = HealthProfile.objects.get(user__email="alex@example.com")
@@ -125,6 +159,7 @@ class AdminProfileListApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         profile.refresh_from_db()
         self.assertTrue(profile.is_active)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
 
     def test_anonymous_and_standard_users_cannot_change_profile_status(self):
         profile = HealthProfile.objects.get(user__email="alex@example.com")
@@ -147,6 +182,7 @@ class AdminProfileListApiTests(APITestCase):
         self.assertEqual(standard_response.status_code, status.HTTP_403_FORBIDDEN)
         profile.refresh_from_db()
         self.assertTrue(profile.is_active)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
 
     def test_profile_status_mutation_requires_csrf(self):
         profile = HealthProfile.objects.get(user__email="alex@example.com")
@@ -177,3 +213,7 @@ class AdminProfileListApiTests(APITestCase):
         self.assertEqual(missing_token_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(invalid_token_response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(valid_token_response.status_code, status.HTTP_200_OK)
+        event = ProfileAuditEvent.objects.get()
+        self.assertEqual(event.actor, self.admin)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.DEACTIVATED)
+        self.assertEqual(event.profile_id, profile.pk)

@@ -87,3 +87,26 @@ class HealthProfile(models.Model):
 
     def __str__(self):
         return self.full_name
+
+
+class ProfileAuditEvent(models.Model):
+    class Action(models.TextChoices):
+        CREATED = "profile_created", _("Profile created")
+        UPDATED = "profile_updated", _("Profile updated")
+        DELETED = "profile_deleted", _("Profile deleted")
+        DEACTIVATED = "profile_deactivated", _("Profile deactivated")
+        REACTIVATED = "profile_reactivated", _("Profile reactivated")
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profile_audit_events",
+    )
+    action = models.CharField(max_length=32, choices=Action.choices)
+    profile_id = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

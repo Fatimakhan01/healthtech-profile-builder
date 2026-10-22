@@ -5,7 +5,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import User
 
-from .models import HealthProfile
+from .models import HealthProfile, ProfileAuditEvent
 
 
 class CurrentHealthProfileApiTests(APITestCase):
@@ -98,6 +98,10 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertEqual(self.profile.full_name, "Updated Owner")
         self.assertEqual(self.profile.age_range, "25_34")
         self.assertEqual(self.profile.wellness_goals, "Improve daily activity")
+        event = ProfileAuditEvent.objects.get()
+        self.assertEqual(event.actor, self.user)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.UPDATED)
+        self.assertEqual(event.profile_id, self.profile.pk)
 
     def test_patch_ignores_returned_completion_field_without_allowing_override(self):
         response = self.client.patch(
@@ -129,6 +133,7 @@ class CurrentHealthProfileApiTests(APITestCase):
                     format="json",
                 )
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertFalse(ProfileAuditEvent.objects.exists())
 
     def test_incomplete_emergency_contact_is_rejected(self):
         response = self.client.patch(
@@ -139,6 +144,7 @@ class CurrentHealthProfileApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("emergency_contact_name", response.data)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
 
     def test_protected_profile_fields_are_rejected(self):
         for payload in (
@@ -173,6 +179,10 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(HealthProfile.objects.filter(pk=self.profile.pk).exists())
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        event = ProfileAuditEvent.objects.get()
+        self.assertEqual(event.actor, self.user)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.DELETED)
+        self.assertEqual(event.profile_id, self.profile.pk)
 
         missing_response = self.client.delete(self.profile_url)
 
@@ -219,6 +229,13 @@ class CurrentHealthProfileApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["full_name"], "Recreated Owner")
         self.assertTrue(response.data["is_complete"])
+        profile = HealthProfile.objects.get(user=self.user)
+        event = ProfileAuditEvent.objects.get(
+            action=ProfileAuditEvent.Action.CREATED
+        )
+        self.assertEqual(event.actor, self.user)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.CREATED)
+        self.assertEqual(event.profile_id, profile.pk)
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
         self.assertTrue(
             HealthProfile.objects.filter(
@@ -239,6 +256,28 @@ class CurrentHealthProfileApiTests(APITestCase):
             HealthProfile.objects.filter(user=self.user).count(),
             1,
         )
+        self.assertFalse(ProfileAuditEvent.objects.exists())
+
+    def test_audit_event_stores_only_actor_action_profile_id_and_timestamp(self):
+        self.client.patch(
+            self.profile_url,
+            {
+                "allergies": "sensitive allergy value",
+                "emergency_contact_name": "Sensitive Contact",
+                "emergency_contact_relationship": "Friend",
+                "emergency_contact_phone": "555-555-5555",
+            },
+            format="json",
+        )
+
+        event = ProfileAuditEvent.objects.get()
+        self.assertEqual(
+            {field.name for field in event._meta.fields},
+            {"id", "actor", "action", "profile_id", "created_at"},
+        )
+        self.assertEqual(event.actor, self.user)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.UPDATED)
+        self.assertEqual(event.profile_id, self.profile.pk)
 
     def test_profile_routes_are_scoped_to_the_authenticated_user(self):
         other_user = User.objects.create_user(

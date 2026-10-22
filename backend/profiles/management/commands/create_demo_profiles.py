@@ -3,7 +3,7 @@ from django.db import transaction
 
 from accounts.models import User
 
-from profiles.models import HealthProfile
+from profiles.models import HealthProfile, ProfileAuditEvent
 
 
 DEMO_PROFILES = (
@@ -50,12 +50,17 @@ class Command(BaseCommand):
                 )
                 user.set_unusable_password()
                 user.save(force_insert=True)
-                HealthProfile.objects.create(
+                profile = HealthProfile.objects.create(
                     user=user,
                     full_name=demo_profile["full_name"],
                     age_range=demo_profile["age_range"],
                     contact_preference=demo_profile["contact_preference"],
                     wellness_goals=demo_profile["wellness_goals"],
+                )
+                ProfileAuditEvent.objects.create(
+                    actor=None,
+                    action=ProfileAuditEvent.Action.CREATED,
+                    profile_id=profile.pk,
                 )
                 created += 1
 

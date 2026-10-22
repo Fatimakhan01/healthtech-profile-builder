@@ -59,14 +59,16 @@ Refresh obtains a new short-lived JWT from the Django session; it is not a JWT r
 
 ## Standard-user health profile API
 
-The authenticated Django endpoint `POST /api/profiles/me/` recreates a missing profile for the current standard user. Send the normal profile fields, including required `full_name`; success returns `201` with the created profile. If the user already has a profile, it returns `409` without changing it. `DELETE /api/profiles/me/` deletes only the current user's profile and returns `204`; it does not delete the user account. If a profile is absent, `GET`, `PATCH`, and `DELETE` return `404`. The existing same-origin Next.js profile proxy exposes only `GET` and `PATCH`, so use the authenticated Django API for delete and recreation.
+The authenticated Django endpoint `POST /api/profiles/me/` creates or recreates a profile for the current standard user. Send the normal profile fields, including required `full_name`; success returns `201` with the created profile. If the user already has a profile, it returns `409` without changing it. `DELETE /api/profiles/me/` deletes only the current user's profile and returns `204`; it does not delete the user account. If a profile is absent, `GET`, `PATCH`, and `DELETE` return `404`.
 
-Both browser routes are same-origin Next.js proxies to Django `/api/profiles/me/`.
+All browser routes below are same-origin Next.js proxies to Django `/api/profiles/me/`.
 
 | Method and route | Purpose | Authentication |
 |---|---|---|
 | `GET /api/profile/me/` (browser) → `GET /api/profiles/me/` (Django) | Retrieve the authenticated user's own profile. | Standard-user JWT. |
+| `POST /api/profile/me/` (browser) → `POST /api/profiles/me/` (Django) | Create or recreate the authenticated user's profile. | Standard-user JWT. |
 | `PATCH /api/profile/me/` (browser) → `PATCH /api/profiles/me/` (Django) | Update permitted fields on that user's profile. | Standard-user JWT. |
+| `DELETE /api/profile/me/` (browser) → `DELETE /api/profiles/me/` (Django) | Delete only the authenticated user's profile; the account remains active. | Standard-user JWT. |
 
 The patch body may contain any subset of `full_name`, `age_range`, `contact_preference`, `wellness_goals`, `allergies`, `emergency_contact_name`, `emergency_contact_relationship`, `emergency_contact_phone`, and `lifestyle_notes`. Example:
 
@@ -90,7 +92,19 @@ Content-Type: application/json
 }
 ```
 
-The response contains the permitted profile fields only. Profile ownership is derived from the authenticated user; `user`, `is_active`, timestamps, and unknown fields cannot be written through this API. Full name must not be blank, choice values must be valid, the phone must match the model validator, and emergency-contact name, relationship, and phone must be supplied together. Invalid input returns `400`; missing/invalid authentication returns `401`. Standard users cannot retrieve or edit another user's profile.
+Profile responses include permitted fields, read-only timestamps, and derived read-only `is_complete` status. A profile is complete when its trimmed full name is non-empty and its age range is a defined choice; “Prefer not to say” is valid. Profile ownership is derived from the authenticated user; `user`, `is_active`, timestamps, `is_complete`, and unknown fields cannot be used to change the profile. Full name must not be blank, choice values must be valid, the phone must match the model validator, and emergency-contact name, relationship, and phone must be supplied together. Invalid input returns `400`; missing/invalid authentication returns `401`; GET, PATCH, or DELETE for an absent profile returns `404`; duplicate profile creation returns `409`. Standard users cannot retrieve or edit another user's profile.
+
+## Profile audit events
+
+Successful profile creation (including signup, profile recreation, and fictional demo-profile creation), update, deletion, and admin profile activation changes create a server-side `profiles.ProfileAuditEvent` in the same database transaction as the action. Each event stores the authenticated actor when available (demo-command events have no actor), a fixed action type, the profile ID, and its timestamp. The profile ID is retained as a scalar so a deletion event remains identifiable; the actor reference is nullable and becomes empty if that account is later removed. Audit events never store profile payloads, passwords, JWTs, session tokens, allergies, emergency-contact details, or other field values. Failed validation, authorization, or persistence does not produce a success event. Events are not exposed through an API endpoint.
+
+Apply the audit model migration and run focused verification from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py test profiles.test_api profiles.test_admin_api profiles.test_demo_command accounts.test_auth
+.\.venv\Scripts\python.exe manage.py check
+```
 
 ## Administrator session and CSRF API
 

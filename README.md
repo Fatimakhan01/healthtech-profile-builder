@@ -14,9 +14,9 @@ HealthProfile is a full-stack assignment foundation with a TypeScript/Next.js fr
 
 ## Implemented features
 
-**Standard users** can sign up, log in, restore their session, retrieve and edit their own health profile, and log out. Profile fields are limited to wellness goals and preferences, optional allergy information, and optional emergency-contact/lifestyle details; clinical diagnoses and precise dates of birth are not collected.
+**Standard users** can sign up, log in, restore their session, create, retrieve, edit, and delete only their own health profile, and log out. Deleting a profile keeps the account; the signed-in user can recreate it. Successful profile changes are recorded as metadata-only server-side audit events. Profile fields are limited to wellness goals and preferences, optional allergy information, and optional emergency-contact/lifestyle details; clinical diagnoses and precise dates of birth are not collected.
 
-**Administrators** use a separate Django session and CSRF-protected login. Staff can search, filter, and paginate the profile directory, open a profile detail view, and deactivate or reactivate a profile. The latter changes only `HealthProfile.is_active`; it does not disable the Django user or delete profile data.
+**Administrators** use a separate Django session and CSRF-protected login. Staff can search, filter, and paginate the profile directory, open a profile detail view, and deactivate or reactivate a profile. Successful status changes are audited. The status action changes only `HealthProfile.is_active`; it does not disable the Django user or delete profile data.
 
 ## Prerequisites
 

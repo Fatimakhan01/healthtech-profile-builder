@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -12,7 +13,7 @@ from .admin_serializers import (
     AdminHealthProfileSerializer,
     AdminProfileStatusSerializer,
 )
-from .models import HealthProfile
+from .models import HealthProfile, ProfileAuditEvent
 
 
 class AdminProfilePagination(PageNumberPagination):
@@ -55,8 +56,19 @@ class AdminProfileStatusView(APIView):
             data=request.data,
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        with transaction.atomic():
+            profile = serializer.save()
+            action = (
+                ProfileAuditEvent.Action.REACTIVATED
+                if profile.is_active
+                else ProfileAuditEvent.Action.DEACTIVATED
+            )
+            ProfileAuditEvent.objects.create(
+                actor=request.user,
+                action=action,
+                profile_id=profile.pk,
+            )
         return Response(
-            AdminHealthProfileSerializer(serializer.instance).data,
+            AdminHealthProfileSerializer(profile).data,
             status=status.HTTP_200_OK,
         )

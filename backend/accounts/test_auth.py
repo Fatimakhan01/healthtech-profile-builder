@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
-from profiles.models import HealthProfile
+from profiles.models import HealthProfile, ProfileAuditEvent
 
 from .models import User
 
@@ -48,6 +48,10 @@ class StandardUserAuthenticationTests(APITestCase):
         self.assertEqual(response.data["user"]["email"], "person@example.com")
         self.assertNotIn("password", response.data["user"])
         self.assertNotIn("password", response.data)
+        event = ProfileAuditEvent.objects.get()
+        self.assertEqual(event.actor, user)
+        self.assertEqual(event.action, ProfileAuditEvent.Action.CREATED)
+        self.assertEqual(event.profile_id, user.health_profile.pk)
 
     def test_login_returns_short_lived_access_token_for_standard_user(self):
         self.create_standard_user()

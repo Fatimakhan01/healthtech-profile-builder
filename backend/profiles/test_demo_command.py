@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from accounts.models import User
 
-from .models import HealthProfile
+from .models import HealthProfile, ProfileAuditEvent
 
 
 class CreateDemoProfilesCommandTests(TestCase):
@@ -23,6 +23,20 @@ class CreateDemoProfilesCommandTests(TestCase):
                 user__email__startswith="demo.member."
             ).count(),
             3,
+        )
+        audit_events = list(ProfileAuditEvent.objects.all())
+        self.assertEqual(len(audit_events), 3)
+        self.assertTrue(
+            all(event.action == ProfileAuditEvent.Action.CREATED for event in audit_events)
+        )
+        self.assertTrue(all(event.actor is None for event in audit_events))
+        self.assertEqual(
+            {event.profile_id for event in audit_events},
+            set(
+                HealthProfile.objects.filter(
+                    user__email__startswith="demo.member."
+                ).values_list("pk", flat=True)
+            ),
         )
 
         users = list(User.objects.filter(email__startswith="demo.member."))
@@ -54,6 +68,7 @@ class CreateDemoProfilesCommandTests(TestCase):
             },
             original_profiles,
         )
+        self.assertEqual(ProfileAuditEvent.objects.count(), 3)
 
     def test_command_does_not_modify_existing_matching_email(self):
         existing_user = User.objects.create_user(
@@ -83,5 +98,6 @@ class CreateDemoProfilesCommandTests(TestCase):
             ).count(),
             3,
         )
+        self.assertEqual(ProfileAuditEvent.objects.count(), 2)
         self.assertIn("Created 2 fictional demo profile(s)", output.getvalue())
         self.assertIn("skipped 1 existing demo email(s)", output.getvalue())
