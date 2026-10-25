@@ -60,6 +60,17 @@ On 2026-10-19:
 
 These results are command output from this audit. They do not substitute for manual interaction testing in a browser.
 
+### Final integration verification — 2026-10-22
+
+The following are the results reported by the final integration run on 2026-10-22. They are retained verification evidence and were **not rerun during this documentation-only update**:
+
+- Full Django test suite — 70 tests passed.
+- Django `manage.py check` — passed with no issues.
+- Django `manage.py makemigrations --check --dry-run` and `manage.py migrate --check` — passed.
+- Frontend `npm run lint` — passed.
+- Frontend `npm run build` — passed, including TypeScript checking and production build.
+- `git diff --check` — passed.
+
 ### Developer-reported manual checks
 
 The project task history reports that standard-user and admin workflows were manually tested. The exact browser steps, environment, and screenshots for those tests were not retained, so this report does not treat them as independently reproduced during the documentation audit.

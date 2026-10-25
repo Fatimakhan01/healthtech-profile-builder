@@ -1,6 +1,6 @@
 # HealthProfile
 
-HealthProfile is a full-stack assignment foundation with a TypeScript/Next.js frontend and a Django REST Framework backend. The frontend and backend keep their dependencies separate.
+HealthProfile is a completed full-stack application for user-owned health profiles, with a Next.js frontend, Django REST Framework API, and PostgreSQL database. The frontend and backend keep their dependencies separate.
 
 ## Project layout
 
@@ -165,10 +165,14 @@ The browser-facing auth routes are `GET /api/auth/csrf/`, `POST /api/auth/signup
 
 ## Health profile API
 
-The same-origin browser routes `GET/PATCH /api/profile/me/` proxy to Django `GET/PATCH /api/profiles/me/`. Both require a standard-user access token:
+The same-origin browser routes all proxy to Django `/api/profiles/me/` and require a standard-user access token:
 
-- `GET /api/profiles/me/` — retrieve the authenticated user's own health profile.
-- `PATCH /api/profiles/me/` — update permitted profile fields. The API resolves the profile from the authenticated user; clients cannot select another profile.
+- `GET /api/profile/me/` → `GET /api/profiles/me/` — retrieve the authenticated user's own health profile.
+- `POST /api/profile/me/` → `POST /api/profiles/me/` — create or recreate that user's profile; returns `409` if one already exists.
+- `PATCH /api/profile/me/` → `PATCH /api/profiles/me/` — update permitted profile fields. The API resolves the profile from the authenticated user; clients cannot select another profile.
+- `DELETE /api/profile/me/` → `DELETE /api/profiles/me/` — delete only that user's profile; the user account remains active.
+
+If no profile exists, GET, PATCH, and DELETE return `404`; use POST to create it again. These actions do not delete or recreate the user account.
 
 Example request:
 
@@ -192,7 +196,7 @@ Content-Type: application/json
 }
 ```
 
-The response contains only those health-profile fields. User ownership, active status, and timestamps are not writable or returned by this API. Unknown/protected fields, invalid choices, invalid phone numbers, and incomplete emergency-contact details return `400`; missing/invalid authentication returns `401`.
+Profile responses include permitted health-profile fields, read-only timestamps, and the derived read-only `is_complete` field. User ownership and active status are not writable or returned by the member API. Unknown/protected fields, invalid choices, invalid phone numbers, and incomplete emergency-contact details return `400`; missing/invalid authentication returns `401`.
 
 ## Administrator session API
 
@@ -220,6 +224,8 @@ The admin UI is available at `/admin`. Its session-protected profile table calls
 `accounts.User` is the authentication identity and uses a normalized email address. A regular unique constraint supports Django's `USERNAME_FIELD` checks and exact normalized-email lookups; an additional database unique constraint on `LOWER(email)` prevents case-only duplicates even for writes that bypass application normalization. The user manager creates standard users by default and reserves administrator creation for Django's superuser manager path.
 
 Each user may have one `profiles.HealthProfile`; deleting a user cascades to that profile. The profile stores a full name, optional age band (not date of birth), contact preference, wellness goals, optional allergies, optional emergency-contact details, optional lifestyle notes, active status, and timestamps. It deliberately does not model clinical diagnoses. An index on `(is_active, created_at DESC)` supports administrative profile listing by status and recency; the one-to-one relation and normalized-email constraint are indexed by their database constraints.
+
+The `profiles.ProfileAuditEvent` model and its migration, `profiles.0002_profile_audit_event`, retain metadata-only server-side audit events for successful profile changes and admin status actions. The event stores the actor reference when available, action, profile ID, and creation timestamp, not profile field values or authentication secrets.
 
 Initial migrations are in `backend/accounts/migrations/` and `backend/profiles/migrations/`. They define schema only; run them only after verifying the configured PostgreSQL database and credentials. On 2026-10-19, read-only inspection connected to the configured PostgreSQL 18.4 database, found the user/profile tables and documented constraints/indexes, and showed all migrations applied. A fresh setup must provision its own database and apply migrations.
 
