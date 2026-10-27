@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -51,11 +53,28 @@ class AdminProfileStatusView(APIView):
 
     def patch(self, request, profile_id):
         profile = get_object_or_404(HealthProfile, pk=profile_id)
+        if not isinstance(request.data, Mapping):
+            raise ValidationError({"detail": "Expected an object with is_active."})
+        if "is_active" not in request.data:
+            raise ValidationError({"is_active": "This field is required."})
+        unexpected_fields = set(request.data) - {"is_active"}
+        if unexpected_fields:
+            raise ValidationError({"detail": "Only is_active may be updated."})
+        if type(request.data["is_active"]) is not bool:
+            raise ValidationError({"is_active": "Must be a JSON boolean."})
+
         serializer = AdminProfileStatusSerializer(
             profile,
             data=request.data,
         )
         serializer.is_valid(raise_exception=True)
+        requested_status = serializer.validated_data["is_active"]
+        if requested_status == profile.is_active:
+            return Response(
+                AdminHealthProfileSerializer(profile).data,
+                status=status.HTTP_200_OK,
+            )
+
         with transaction.atomic():
             profile = serializer.save()
             action = (
