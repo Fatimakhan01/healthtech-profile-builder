@@ -121,6 +121,11 @@ class AdminProfileListApiTests(APITestCase):
         self.assertFalse(deactivate_response.data["is_active"])
         profile.refresh_from_db()
         self.assertFalse(profile.is_active)
+        self.assertEqual(ProfileAuditEvent.objects.count(), 1)
+        self.assertEqual(
+            ProfileAuditEvent.objects.get().action,
+            ProfileAuditEvent.Action.DEACTIVATED,
+        )
         self.assertTrue(profile.user.is_active)
         self.assertTrue(
             HealthProfile.objects.filter(pk=profile.pk).exists()
@@ -136,6 +141,7 @@ class AdminProfileListApiTests(APITestCase):
         self.assertTrue(reactivate_response.data["is_active"])
         profile.refresh_from_db()
         self.assertTrue(profile.is_active)
+        self.assertEqual(ProfileAuditEvent.objects.count(), 2)
         events = list(ProfileAuditEvent.objects.order_by("created_at"))
         self.assertEqual(
             [event.action for event in events],
@@ -147,18 +153,93 @@ class AdminProfileListApiTests(APITestCase):
         self.assertTrue(all(event.actor == self.admin for event in events))
         self.assertTrue(all(event.profile_id == profile.pk for event in events))
 
-    def test_profile_status_endpoint_rejects_non_boolean_values(self):
+    def test_profile_status_endpoint_rejects_empty_payload(self):
         profile = HealthProfile.objects.get(user__email="alex@example.com")
 
         response = self.client.patch(
             self.status_url.format(profile.pk),
-            {"is_active": "sometimes"},
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("is_active", response.data)
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_active)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
+
+    def test_profile_status_endpoint_requires_is_active(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"unexpected": "value"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("is_active", response.data)
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_active)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
+
+    def test_profile_status_endpoint_rejects_non_boolean_values(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        for value in ("true", "false", "yes", 0, 1, None):
+            with self.subTest(value=value):
+                response = self.client.patch(
+                    self.status_url.format(profile.pk),
+                    {"is_active": value},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                profile.refresh_from_db()
+                self.assertTrue(profile.is_active)
+                self.assertFalse(ProfileAuditEvent.objects.exists())
+
+    def test_profile_status_endpoint_rejects_unexpected_fields(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False, "role": "admin"},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         profile.refresh_from_db()
         self.assertTrue(profile.is_active)
+        self.assertFalse(ProfileAuditEvent.objects.exists())
+
+    def test_repeating_active_status_is_successful_without_audit_event(self):
+        profile = HealthProfile.objects.get(user__email="alex@example.com")
+
+        response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_active"])
+        self.assertEqual(
+            ProfileAuditEvent.objects.filter(profile_id=profile.pk).count(),
+            0,
+        )
+
+    def test_repeating_inactive_status_is_successful_without_audit_event(self):
+        profile = HealthProfile.objects.get(user__email="blair@example.com")
+
+        response = self.client.patch(
+            self.status_url.format(profile.pk),
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_active"])
         self.assertFalse(ProfileAuditEvent.objects.exists())
 
     def test_anonymous_and_standard_users_cannot_change_profile_status(self):

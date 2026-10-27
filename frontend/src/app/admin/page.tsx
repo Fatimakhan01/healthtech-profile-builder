@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type AdminUser = {
   id: number;
@@ -38,6 +38,8 @@ type ApiResponse = {
   updated_at?: string;
   [field: string]: unknown;
 };
+
+const PROFILE_PAGE_SIZE = 10;
 
 async function readApiResponse(response: Response): Promise<ApiResponse> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -91,6 +93,14 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const directoryQueryKey = JSON.stringify([
+    admin?.id ?? null,
+    appliedSearch.trim(),
+    activeFilter,
+    page,
+  ]);
+  const directoryQueryKeyRef = useRef(directoryQueryKey);
+  const directoryRequestId = useRef(0);
 
   const checkSession = useCallback(async () => {
     const csrfResponse = await fetch("/api/admin/csrf/", {
@@ -146,6 +156,20 @@ export default function AdminPage() {
     if (!admin) {
       return;
     }
+    const requestQueryKey = JSON.stringify([
+      admin.id,
+      appliedSearch.trim(),
+      activeFilter,
+      page,
+    ]);
+    if (requestQueryKey !== directoryQueryKeyRef.current) {
+      return;
+    }
+    const requestId = ++directoryRequestId.current;
+    const isCurrentRequest = () =>
+      requestId === directoryRequestId.current &&
+      requestQueryKey === directoryQueryKeyRef.current;
+
     setLoadingProfiles(true);
     setError("");
     const parameters = new URLSearchParams({ page: String(page) });
@@ -161,6 +185,9 @@ export default function AdminPage() {
         cache: "no-store",
       });
       const payload = await readApiResponse(response);
+      if (!isCurrentRequest()) {
+        return;
+      }
       if (response.status === 401 || response.status === 403) {
         setAdmin(null);
         setProfiles([]);
@@ -176,19 +203,28 @@ export default function AdminPage() {
       setNext(payload.next ?? null);
       setPrevious(payload.previous ?? null);
     } catch (requestError) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Could not load profiles.",
       );
     } finally {
-      setLoadingProfiles(false);
+      if (isCurrentRequest()) {
+        setLoadingProfiles(false);
+      }
     }
   }, [activeFilter, admin, appliedSearch, page]);
 
   useEffect(() => {
+    directoryQueryKeyRef.current = directoryQueryKey;
     void Promise.resolve().then(loadProfiles);
-  }, [loadProfiles]);
+    return () => {
+      directoryRequestId.current += 1;
+    };
+  }, [directoryQueryKey, loadProfiles]);
 
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -328,7 +364,29 @@ export default function AdminPage() {
             }
           : current,
       );
-      await loadProfiles();
+
+      const leftActiveFilter =
+        updatedActiveState !== profile.is_active &&
+        ((activeFilter === "true" && profile.is_active) ||
+          (activeFilter === "false" && !profile.is_active));
+      const updatedCount = leftActiveFilter
+        ? Math.max(0, count - 1)
+        : count;
+      const lastValidPage = Math.max(
+        1,
+        Math.ceil(updatedCount / PROFILE_PAGE_SIZE),
+      );
+      setCount(updatedCount);
+
+      if (page > lastValidPage) {
+        setProfiles([]);
+        setNext(null);
+        setPrevious(null);
+        setLoadingProfiles(true);
+        setPage(lastValidPage);
+      } else {
+        await loadProfiles();
+      }
     } catch (statusError) {
       setError(
         statusError instanceof Error
