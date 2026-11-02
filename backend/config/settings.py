@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'accounts.apps.AccountsConfig',
     'profiles.apps.ProfilesConfig',
+    'predictions.apps.PredictionsConfig',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

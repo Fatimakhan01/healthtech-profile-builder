@@ -10,7 +10,8 @@ type AuthEndpoint =
   | "admin-login"
   | "admin-session"
   | "admin-profiles"
-  | "admin-profile-status";
+  | "admin-profile-status"
+  | "no-show-prediction";
 
 const SESSION_COOKIE_NAMES = new Set(["sessionid", "csrftoken"]);
 
@@ -40,6 +41,7 @@ export async function proxyAuthRequest(
   if (
     endpoint === "me" ||
     endpoint === "profile" ||
+    endpoint === "no-show-prediction" ||
     endpoint === "session-refresh" ||
     endpoint === "session-logout"
   ) {
@@ -58,6 +60,7 @@ export async function proxyAuthRequest(
     "admin-session",
     "admin-profiles",
     "admin-profile-status",
+    "no-show-prediction",
   ];
   const cookies = sessionEndpoints.includes(endpoint)
     ? getForwardedCookies(request.headers.get("cookie"))
@@ -94,6 +97,7 @@ export async function proxyAuthRequest(
       "admin-session": "/admin/session/",
       "admin-profiles": "/admin/profiles/",
       "admin-profile-status": "/admin/profiles/",
+      "no-show-prediction": "/v1/predictions/no-show/",
     };
     const upstreamPath =
       endpoint === "admin-profile-status"
@@ -135,7 +139,12 @@ export async function proxyAuthRequest(
     return response;
   } catch {
     return Response.json(
-      { detail: "The authentication service is unavailable." },
+      {
+        detail:
+          endpoint === "no-show-prediction"
+            ? "The prediction service is unavailable."
+            : "The authentication service is unavailable.",
+      },
       { status: 502, headers: { "cache-control": "no-store" } },
     );
   }

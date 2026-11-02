@@ -44,7 +44,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
-
+  const [signedOut, setSignedOut] = useState(false);
   useEffect(() => {
     let active = true;
 
@@ -62,7 +62,9 @@ export default function Home() {
         if (active) {
           setCsrfToken(csrfPayload.csrf_token);
         }
-
+        if (sessionStorage.getItem("auth_signed_out") === "true") {
+          return;
+        }
         const response = await fetch("/api/auth/session/refresh/", {
           method: "POST",
           headers: { "x-csrftoken": csrfPayload.csrf_token },
@@ -141,6 +143,8 @@ export default function Home() {
         setError("Could not end the server session. Please try again.");
         return false;
       }
+      sessionStorage.setItem("auth_signed_out", "true");
+
       setAccessToken(null);
       setUser(null);
       setMode("login");
@@ -192,6 +196,8 @@ export default function Home() {
         setMode("login");
         setMessage("Account created. Sign in to continue.");
       } else if (payload.access_token && payload.user) {
+        sessionStorage.removeItem("auth_signed_out");
+
         setAccessToken(payload.access_token);
         setUser(payload.user);
         if (typeof payload.csrf_token === "string") {
@@ -211,7 +217,10 @@ export default function Home() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4f8f7] px-6">
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-          <span className="size-2.5 animate-pulse rounded-full bg-teal-600 motion-reduce:animate-none" aria-hidden="true" />
+          <span
+            className="size-2.5 animate-pulse rounded-full bg-teal-600 motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           <p className="text-sm font-medium text-slate-600" role="status">
             Checking your sign-in session...
           </p>
@@ -234,20 +243,46 @@ export default function Home() {
 
   return (
     <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f8f7] px-4 py-8 sm:px-6 sm:py-12">
-      <div className="pointer-events-none absolute -left-36 top-[-9rem] -z-10 size-[28rem] rounded-full bg-teal-100/70 blur-3xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-48 -right-32 -z-10 size-[32rem] rounded-full bg-cyan-100/60 blur-3xl" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute -left-36 top-[-9rem] -z-10 size-[28rem] rounded-full bg-teal-100/70 blur-3xl"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute -bottom-48 -right-32 -z-10 size-[32rem] rounded-full bg-cyan-100/60 blur-3xl"
+        aria-hidden="true"
+      />
       <section className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_28px_80px_-36px_rgba(15,57,61,0.28)] md:min-h-[38rem] md:grid-cols-[0.9fr_1.1fr]">
         <aside className="relative hidden flex-col justify-between overflow-hidden bg-[#103f43] p-10 text-white md:flex lg:p-12">
-          <div className="pointer-events-none absolute -right-24 top-24 size-72 rounded-full border border-white/10" aria-hidden="true" />
-          <div className="pointer-events-none absolute -right-8 top-40 size-40 rounded-full border border-white/10" aria-hidden="true" />
+          <div
+            className="pointer-events-none absolute -right-24 top-24 size-72 rounded-full border border-white/10"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -right-8 top-40 size-40 rounded-full border border-white/10"
+            aria-hidden="true"
+          />
           <div className="relative">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/20" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" className="size-6 text-teal-200">
-                  <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              <span
+                className="grid size-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/20"
+                aria-hidden="true"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="size-6 text-teal-200"
+                >
+                  <path
+                    d="M12 3v18M3 12h18"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
-              <span className="text-lg font-semibold tracking-tight">HealthProfile</span>
+              <span className="text-lg font-semibold tracking-tight">
+                HealthProfile
+              </span>
             </div>
             <p className="mt-16 text-xs font-semibold uppercase tracking-[0.22em] text-teal-200">
               Your wellness, in focus
@@ -256,7 +291,8 @@ export default function Home() {
               A clearer picture of your wellbeing.
             </h2>
             <p className="mt-5 max-w-sm text-sm leading-7 text-teal-50/75">
-              Keep your health preferences and personal wellness goals together in one thoughtful space.
+              Keep your health preferences and personal wellness goals together
+              in one thoughtful space.
             </p>
           </div>
           <p className="relative text-xs text-teal-100/60">
@@ -266,12 +302,22 @@ export default function Home() {
 
         <div className="flex flex-col justify-center px-6 py-9 sm:px-10 sm:py-12 lg:px-14">
           <div className="mb-8 flex items-center gap-3 md:hidden">
-            <span className="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-teal-100" aria-hidden="true">
+            <span
+              className="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-800 ring-1 ring-teal-100"
+              aria-hidden="true"
+            >
               <svg viewBox="0 0 24 24" fill="none" className="size-5">
-                <path d="M12 3v18M3 12h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                <path
+                  d="M12 3v18M3 12h18"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
               </svg>
             </span>
-            <span className="text-base font-semibold tracking-tight text-slate-900">HealthProfile</span>
+            <span className="text-base font-semibold tracking-tight text-slate-900">
+              HealthProfile
+            </span>
           </div>
 
           <div>
@@ -279,7 +325,9 @@ export default function Home() {
               {mode === "signup" ? "Get started" : "Welcome back"}
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.1rem]">
-              {mode === "signup" ? "Create your account" : "Sign in to continue"}
+              {mode === "signup"
+                ? "Create your account"
+                : "Sign in to continue"}
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {mode === "signup"
@@ -327,12 +375,18 @@ export default function Home() {
               />
             </label>
             {error && (
-              <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800" role="alert">
+              <p
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800"
+                role="alert"
+              >
                 {error}
               </p>
             )}
             {message && (
-              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800" role="status">
+              <p
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800"
+                role="status"
+              >
                 {message}
               </p>
             )}

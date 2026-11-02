@@ -1,0 +1,120 @@
+{
+  "model_version": "no-show-v1",
+  "random_seed": 42,
+  "split_strategy": "Stratified 70% train, 15% validation, 15% test",
+  "split_sizes": {
+    "train": 1400,
+    "validation": 300,
+    "test": 300
+  },
+  "feature_names": [
+    "days_ahead",
+    "previous_no_shows",
+    "sms_reminder",
+    "weekday"
+  ],
+  "target_name": "no_show",
+  "class_distribution": {
+    "overall": {
+      "attended_0": {
+        "count": 1024,
+        "proportion": 0.512
+      },
+      "no_show_1": {
+        "count": 976,
+        "proportion": 0.488
+      }
+    },
+    "train": {
+      "attended_0": {
+        "count": 717,
+        "proportion": 0.5121428571428571
+      },
+      "no_show_1": {
+        "count": 683,
+        "proportion": 0.4878571428571429
+      }
+    },
+    "validation": {
+      "attended_0": {
+        "count": 153,
+        "proportion": 0.51
+      },
+      "no_show_1": {
+        "count": 147,
+        "proportion": 0.49
+      }
+    },
+    "test": {
+      "attended_0": {
+        "count": 154,
+        "proportion": 0.5133333333333333
+      },
+      "no_show_1": {
+        "count": 146,
+        "proportion": 0.4866666666666667
+      }
+    }
+  },
+  "validation_metrics": {
+    "DummyClassifier": {
+      "accuracy": 0.51,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "confusion_matrix": [
+        [
+          153,
+          0
+        ],
+        [
+          147,
+          0
+        ]
+      ],
+      "roc_auc": 0.5
+    },
+    "LogisticRegression": {
+      "accuracy": 0.7,
+      "precision": 0.728,
+      "recall": 0.6190476190476191,
+      "f1_score": 0.6691176470588235,
+      "confusion_matrix": [
+        [
+          119,
+          34
+        ],
+        [
+          56,
+          91
+        ]
+      ],
+      "roc_auc": 0.7534124761015517
+    }
+  },
+  "selected_model": "LogisticRegression",
+  "test_metrics": {
+    "accuracy": 0.68,
+    "precision": 0.7049180327868853,
+    "recall": 0.589041095890411,
+    "f1_score": 0.6417910447761194,
+    "confusion_matrix": [
+      [
+        118,
+        36
+      ],
+      [
+        60,
+        86
+      ]
+    ],
+    "roc_auc": 0.7560487457747732
+  },
+  "error_analysis": {
+    "false_positives": 36,
+    "false_positive_meaning": "Predicted no-show, but the synthetic label was attended.",
+    "false_negatives": 60,
+    "false_negative_meaning": "Predicted attended, but the synthetic label was no-show."
+  },
+  "accuracy_note": "Accuracy alone can hide poor detection of the less common class; consider precision, recall, F1, ROC-AUC, and the confusion matrix."
+}

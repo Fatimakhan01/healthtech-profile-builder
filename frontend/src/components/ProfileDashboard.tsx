@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import NoShowPrediction from "./NoShowPrediction";
 
 type AuthUser = {
   id: number;
@@ -547,6 +548,11 @@ export default function ProfileDashboard({
           )}
           </div>
         </section>
+        <NoShowPrediction
+          accessToken={accessToken}
+          onSessionExpired={onSessionExpired}
+          refreshAccessToken={refreshAccessToken}
+        />
       </div>
     </main>
   );
