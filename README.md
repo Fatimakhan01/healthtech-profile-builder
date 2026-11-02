@@ -1,14 +1,17 @@
 # HealthProfile
 
-HealthProfile is a completed full-stack application for user-owned health profiles, with a Next.js frontend, Django REST Framework API, and PostgreSQL database. The frontend and backend keep their dependencies separate.
+HealthProfile is a full-stack health-profile application with standard-user and administrator workflows, audit events, and an educational synthetic no-show prediction prototype. It uses a Next.js frontend, Django REST Framework API, PostgreSQL database, and a scikit-learn pipeline. Frontend, backend, and ML dependencies are managed separately.
 
 ## Project layout
 
 - `frontend/` — Next.js App Router application, TypeScript, and Tailwind CSS.
 - `backend/accounts/` — custom email-based user model and standard/admin role definitions.
 - `backend/profiles/` — one-to-one health profile schema.
+- `backend/predictions/` — versioned synthetic no-show prediction API.
+- `backend/ml/` — synthetic dataset generation, EDA, training, and evaluation scripts.
 - `backend/` — Django project and pinned Python dependencies.
 - `backend/.venv/` — local Python virtual environment (not tracked by Git).
+- `.venv-integration/` — local Python 3.13.17 environment for ML dependencies and prediction API verification (not tracked by Git).
 - `docs/` — API/authentication reference, schema/constraint diagram, and AI-workflow evidence.
 - `.env.example` — names of local settings to configure; it contains placeholders, not credentials.
 
@@ -17,6 +20,8 @@ HealthProfile is a completed full-stack application for user-owned health profil
 **Standard users** can sign up, log in, restore their session, create, retrieve, edit, and delete only their own health profile, and log out. Deleting a profile keeps the account; the signed-in user can recreate it. Successful profile changes are recorded as metadata-only server-side audit events. Profile fields are limited to wellness goals and preferences, optional allergy information, and optional emergency-contact/lifestyle details; clinical diagnoses and precise dates of birth are not collected.
 
 **Administrators** use a separate Django session and CSRF-protected login. Staff can search, filter, and paginate the profile directory, open a profile detail view, and deactivate or reactivate a profile. Successful status changes are audited. The status action changes only `HealthProfile.is_active`; it does not disable the Django user or delete profile data.
+
+**Week 3 prediction prototype** adds a No-Show Prediction section to the signed-in dashboard. It sends the supplied educational inputs through the same-origin Next.js proxy to Django's versioned prediction endpoint; it does not create or schedule appointments. Predictions come from a model trained on entirely synthetic records and are not clinical or real-world risk estimates. See [backend/ml/README.md](./backend/ml/README.md) for the dataset, methods, results, and reproducible commands.
 
 ## Prerequisites
 
@@ -108,18 +113,58 @@ Pop-Location
 
 The frontend is normally served at `http://localhost:3000`; Django's development server is normally served at `http://127.0.0.1:8000`. The Next.js proxy defaults to `http://127.0.0.1:8000/api`; set `BACKEND_API_URL` in the Next.js server environment to override it.
 
+### ML environment and scripts
+
+The ML scripts and prediction API tests were verified with Python 3.13.17 in
+`.venv-integration`; other Python versions have not been verified for this
+environment. From the repository root in PowerShell, create that environment
+and install the existing backend and ML requirements:
+
+```powershell
+if (-not (Test-Path .venv-integration)) { py -3.13 -m venv .venv-integration }
+.\.venv-integration\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv-integration\Scripts\python.exe -m pip install -r backend\ml\requirements-ml.txt
+```
+
+Run the ML workflow from the repository root:
+
+```powershell
+.\.venv-integration\Scripts\python.exe backend\ml\generate_data.py
+.\.venv-integration\Scripts\python.exe backend\ml\eda.py
+.\.venv-integration\Scripts\python.exe backend\ml\train.py
+.\.venv-integration\Scripts\python.exe backend\ml\evaluate.py
+.\.venv-integration\Scripts\python.exe backend\ml\diagnostics.py
+.\.venv-integration\Scripts\python.exe backend\ml\regularization_experiment.py
+```
+
+`generate_data.py` replaces the synthetic CSV; `train.py` replaces the saved
+pipeline and `outputs/metrics.json`. Do not run those two commands if you need
+to preserve the current data and recorded results. The evaluation and
+diagnostic scripts and their output files are described in the [ML
+documentation](./backend/ml/README.md).
+
+To serve the no-show prediction endpoint, run Django with the integration
+environment (it contains the ML packages as well as the backend packages):
+
+```powershell
+Push-Location backend
+..\.venv-integration\Scripts\python.exe manage.py runserver
+Pop-Location
+```
+
 ## Technology and architecture
 
 | Area | Implementation |
 |---|---|
 | Frontend | Next.js 16.4.1 App Router, React 19.3.0, TypeScript, Tailwind CSS 4 |
 | Backend | Python 3.14, Django 5.2.13, Django REST Framework 3.18.3 |
+| ML prototype | pandas, matplotlib, scikit-learn, and joblib; synthetic educational data only |
 | Standard-user API authentication | Simple JWT 5.5.1 access JWTs, five-minute lifetime |
 | Admin authentication | Django server-side sessions, CSRF validation, staff permission checks |
 | Database | PostgreSQL only; psycopg 3.3.6 |
 | Environment loading | python-dotenv 1.2.4 loads the repository-root `.env` |
 
-The browser calls same-origin Next.js route handlers. Those handlers proxy to Django and narrowly forward the authentication cookies and headers needed by each route. Frontend and backend dependencies are managed separately in `frontend/package-lock.json` and `backend/requirements.txt`.
+The browser calls same-origin Next.js route handlers. Those handlers proxy to Django and narrowly forward the authentication cookies and headers needed by each route. Frontend, backend, and ML dependencies are managed separately in `frontend/package-lock.json`, `backend/requirements.txt`, and `backend/ml/requirements-ml.txt`.
 
 Standard-user sessions use Django's 14-day default lifetime to restore a fresh five-minute in-memory access JWT after reload. Staff/admin sessions use an explicit 8-hour server-side expiry, shortening the exposure window for privileged sessions; both remain HttpOnly-cookie and CSRF protected.
 
@@ -231,6 +276,40 @@ Initial migrations are in `backend/accounts/migrations/` and `backend/profiles/m
 
 See [docs/api-authentication.md](./docs/api-authentication.md) for full Django and browser-proxy API contracts, [docs/database-er-diagram.md](./docs/database-er-diagram.md) for the ER diagram and verified schema/index details, and [docs/ai-workflow.md](./docs/ai-workflow.md) for evidence-based AI workflow notes. The formal original assignment brief was not located in the repository; confirm submission requirements against the official rubric.
 
+## Synthetic no-show prediction
+
+The prediction UI is available to signed-in standard users in the dashboard.
+The browser posts to the same-origin Next.js route
+`/api/predictions/no-show/`, which proxies to Django
+`POST /api/v1/predictions/no-show/`. For example:
+
+```json
+{
+  "days_ahead": 14,
+  "previous_no_shows": 1,
+  "sms_reminder": "yes",
+  "weekday": "Wednesday"
+}
+```
+
+The current saved pipeline returns an illustrative synthetic response for
+those inputs:
+
+```json
+{
+  "model_version": "no-show-v1",
+  "predicted_class": 0,
+  "predicted_label": "attended",
+  "probability_no_show": 0.320676589796643,
+  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
+}
+```
+
+These are model outputs for fictional data, not predictions about a real
+appointment. They are not clinically validated or suitable for healthcare or
+appointment decisions. Input validation, authentication, and error responses
+are documented in the [API reference](./docs/api-authentication.md).
+
 ## Verify
 
 ```powershell
@@ -239,6 +318,10 @@ Push-Location backend
 .\.venv\Scripts\python.exe manage.py test
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
 .\.venv\Scripts\python.exe -m pip check
+Pop-Location
+
+Push-Location backend
+..\.venv-integration\Scripts\python.exe manage.py test predictions.tests --verbosity 2
 Pop-Location
 
 Push-Location frontend

@@ -21,4 +21,5 @@ urlpatterns = [
     path("api/auth/", include("accounts.session_urls")),
     path("api/admin/", include("accounts.admin_urls")),
     path("api/profiles/", include("profiles.urls")),
+    path("api/v1/predictions/", include("predictions.urls")),
 ]

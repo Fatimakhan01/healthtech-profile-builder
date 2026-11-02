@@ -57,6 +57,63 @@ The frontend holds standard-user access JWTs in JavaScript memory; it does not p
 
 Refresh obtains a new short-lived JWT from the Django session; it is not a JWT refresh-token grant. Logout invalidates the server session, but an already-issued stateless access JWT remains usable until its own five-minute expiry. The API returns safe validation/authentication error bodies; commonly applicable status codes include `400` for invalid input, `401` for invalid credentials or access tokens, `403` for denied permissions/CSRF, and `204` for successful logout.
 
+## Synthetic no-show prediction API
+
+The signed-in dashboard's No-Show Prediction section uses a same-origin Next.js
+proxy. It forwards the standard-user bearer access token to the versioned Django
+endpoint, where the saved pipeline performs inference. This educational feature
+does not book, schedule, or represent a real appointment.
+
+| Method and route | Purpose | Authentication |
+|---|---|---|
+| `POST /api/predictions/no-show/` (browser) → `POST /api/v1/predictions/no-show/` (Django) | Return a synthetic prediction, model version, and disclaimer. | Standard-user access JWT. |
+
+Request JSON requires all four fields. Integer fields must be JSON integers,
+not strings or booleans. Unknown fields are rejected.
+
+| Field | Accepted values |
+|---|---|
+| `days_ahead` | Integer, 0–60 inclusive |
+| `previous_no_shows` | Integer, 0–5 inclusive |
+| `sms_reminder` | `yes` or `no` |
+| `weekday` | `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, `Saturday`, or `Sunday` |
+
+Example request:
+
+```http
+POST /api/predictions/no-show/
+Authorization: Bearer <short-lived-access-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "days_ahead": 14,
+  "previous_no_shows": 1,
+  "sms_reminder": "yes",
+  "weekday": "Wednesday"
+}
+```
+
+The saved pipeline currently returns this response for the example:
+
+```json
+{
+  "model_version": "no-show-v1",
+  "predicted_class": 0,
+  "predicted_label": "attended",
+  "probability_no_show": 0.320676589796643,
+  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
+}
+```
+
+Invalid or missing fields return `400`; missing or invalid authentication is
+rejected by the configured standard-user permission. If the artifact is
+unavailable or inference fails, the endpoint returns `503` with a generic
+message. The probability is learned from artificial labels and is not a
+calibrated or clinically validated real-world risk estimate. Do not use it to
+make clinical or appointment decisions.
+
 ## Standard-user health profile API
 
 The authenticated Django endpoint `POST /api/profiles/me/` creates or recreates a profile for the current standard user. Send the normal profile fields, including required `full_name`; success returns `201` with the created profile. If the user already has a profile, it returns `409` without changing it. `DELETE /api/profiles/me/` deletes only the current user's profile and returns `204`; it does not delete the user account. If a profile is absent, `GET`, `PATCH`, and `DELETE` return `404`.

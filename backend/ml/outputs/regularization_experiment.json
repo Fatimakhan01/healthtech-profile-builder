@@ -1,0 +1,135 @@
+{
+  "scope": "Synthetic data only. Cross-validation uses only the existing training partition; validation and test partitions are not used.",
+  "positive_class": "no_show=1",
+  "training_partition_size": 1400,
+  "split": {
+    "training_fraction": 0.7,
+    "stratified": true,
+    "random_seed": 42
+  },
+  "cross_validation": {
+    "strategy": "5-fold StratifiedKFold",
+    "shuffle": true,
+    "random_seed": 42,
+    "same_folds_for_all_candidates": true
+  },
+  "candidate_configurations": {
+    "dummy": "DummyClassifier(strategy='most_frequent')",
+    "logistic_regression": {
+      "solver": "lbfgs",
+      "max_iter": 1000,
+      "C_values": [
+        0.1,
+        1.0,
+        10.0
+      ],
+      "current_configuration": "C=1.0"
+    }
+  },
+  "scikit_learn_version": "1.5.2",
+  "scipy_version": "1.18.1",
+  "selection_rule": "Highest mean cross-validation binary F1 only; exact ties keep the first candidate in the documented order.",
+  "selected_candidate_by_training_cv_f1": "LogisticRegression_C=1",
+  "candidates": [
+    {
+      "candidate": "DummyClassifier",
+      "metrics_mean_and_sample_std": {
+        "accuracy": {
+          "mean": 0.5121428571428571,
+          "std": 0.0019561519910898722
+        },
+        "precision": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "recall": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "binary_f1": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "roc_auc": {
+          "mean": 0.5,
+          "std": 0.0
+        }
+      }
+    },
+    {
+      "candidate": "LogisticRegression_C=0.1",
+      "metrics_mean_and_sample_std": {
+        "accuracy": {
+          "mean": 0.6664285714285715,
+          "std": 0.028638314566756386
+        },
+        "precision": {
+          "mean": 0.6693719663035873,
+          "std": 0.029836575718641265
+        },
+        "recall": {
+          "mean": 0.6252790897380851,
+          "std": 0.038470359758337104
+        },
+        "binary_f1": {
+          "mean": 0.6463235452366372,
+          "std": 0.03154095010913553
+        },
+        "roc_auc": {
+          "mean": 0.7381073951899682,
+          "std": 0.03512023682773714
+        }
+      }
+    },
+    {
+      "candidate": "LogisticRegression_C=1",
+      "metrics_mean_and_sample_std": {
+        "accuracy": {
+          "mean": 0.6721428571428572,
+          "std": 0.024666138071188583
+        },
+        "precision": {
+          "mean": 0.6765272279412249,
+          "std": 0.028348587650518273
+        },
+        "recall": {
+          "mean": 0.6296586517818807,
+          "std": 0.03266261264440608
+        },
+        "binary_f1": {
+          "mean": 0.6519381995497915,
+          "std": 0.02609300938503332
+        },
+        "roc_auc": {
+          "mean": 0.7380257432801443,
+          "std": 0.03497526068667399
+        }
+      }
+    },
+    {
+      "candidate": "LogisticRegression_C=10",
+      "metrics_mean_and_sample_std": {
+        "accuracy": {
+          "mean": 0.6721428571428572,
+          "std": 0.024923351889097
+        },
+        "precision": {
+          "mean": 0.6769667361853133,
+          "std": 0.02790101432440915
+        },
+        "recall": {
+          "mean": 0.628198797767282,
+          "std": 0.034511930147652685
+        },
+        "binary_f1": {
+          "mean": 0.651362645118104,
+          "std": 0.027245722481330184
+        },
+        "roc_auc": {
+          "mean": 0.7379542964906856,
+          "std": 0.03502922630978343
+        }
+      }
+    }
+  ]
+}
