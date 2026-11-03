@@ -29,6 +29,9 @@ FEATURE_NAMES = [
 TARGET = "no_show"
 THRESHOLDS = (0.30, 0.40, 0.50, 0.60, 0.70)
 CALIBRATION_BIN_COUNT = 5
+LEAD_TIME_BINS = (0, 15, 30, 45, 61)
+LEAD_TIME_LABELS = ("0-14", "15-29", "30-44", "45-60")
+SMS_REMINDER_CATEGORIES = ("yes", "no")
 
 
 def positive_class_probabilities(model, features: pd.DataFrame) -> np.ndarray:
@@ -121,6 +124,73 @@ def calibration_bins(
     return results
 
 
+def subgroup_error_counts(
+    actual: np.ndarray,
+    predicted: np.ndarray,
+) -> dict[str, int]:
+    return {
+        "n": int(len(actual)),
+        "actual_no_show_count": int((actual == 1).sum()),
+        "predicted_no_show_count": int((predicted == 1).sum()),
+        "false_positives": int(((actual == 0) & (predicted == 1)).sum()),
+        "false_negatives": int(((actual == 1) & (predicted == 0)).sum()),
+    }
+
+
+def test_subgroup_error_analysis(
+    features: pd.DataFrame,
+    target: pd.Series,
+    predictions: np.ndarray,
+) -> dict[str, object]:
+    groups = pd.DataFrame(
+        {
+            "days_ahead": features["days_ahead"].to_numpy(),
+            "sms_reminder": features["sms_reminder"].to_numpy(),
+            "actual": target.to_numpy(),
+            "predicted": predictions,
+        }
+    )
+    groups["lead_time_group"] = pd.cut(
+        groups["days_ahead"],
+        bins=LEAD_TIME_BINS,
+        labels=LEAD_TIME_LABELS,
+        right=False,
+    )
+    if groups["lead_time_group"].isna().any():
+        raise ValueError("Test data has days_ahead outside the documented 0-60 range.")
+    if not groups["sms_reminder"].isin(SMS_REMINDER_CATEGORIES).all():
+        raise ValueError("Test data has an invalid sms_reminder category.")
+
+    lead_time_counts = []
+    for label in LEAD_TIME_LABELS:
+        subgroup = groups[groups["lead_time_group"] == label]
+        counts = subgroup_error_counts(
+            subgroup["actual"].to_numpy(),
+            subgroup["predicted"].to_numpy(),
+        )
+        lead_time_counts.append({"group": label, **counts})
+
+    sms_reminder_counts = []
+    for category in SMS_REMINDER_CATEGORIES:
+        subgroup = groups[groups["sms_reminder"] == category]
+        counts = subgroup_error_counts(
+            subgroup["actual"].to_numpy(),
+            subgroup["predicted"].to_numpy(),
+        )
+        sms_reminder_counts.append({"group": category, **counts})
+
+    return {
+        "positive_class": "no_show=1",
+        "decision_threshold": 0.5,
+        "prediction_source": (
+            "Saved pipeline predict(); LogisticRegression uses its default "
+            "0.5 decision threshold."
+        ),
+        "lead_time_days_ahead": lead_time_counts,
+        "sms_reminder": sms_reminder_counts,
+    }
+
+
 def main() -> None:
     data = pd.read_csv(DATA_PATH)
     features = data[FEATURE_NAMES]
@@ -158,6 +228,7 @@ def main() -> None:
         model, validation_features
     )
     test_probabilities = positive_class_probabilities(model, test_features)
+    test_predictions = model.predict(test_features)
 
     test_prevalence = float(test_target.mean())
     results = {
@@ -189,6 +260,11 @@ def main() -> None:
             "mean_predicted_probability": float(test_probabilities.mean()),
             "calibration_bins": calibration_bins(test_target, test_probabilities),
         },
+        "test_subgroup_error_analysis": test_subgroup_error_analysis(
+            test_features,
+            test_target,
+            test_predictions,
+        ),
     }
     print(json.dumps(results, indent=2))
 

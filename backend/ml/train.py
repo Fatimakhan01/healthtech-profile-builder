@@ -1,6 +1,9 @@
 """Train, compare, and evaluate baseline and logistic-regression pipelines."""
 
+import hashlib
+import importlib.metadata
 import json
+import platform
 from pathlib import Path
 
 import joblib
@@ -23,10 +26,12 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 SEED = 42
-MODEL_VERSION = "no-show-v1"
 DATA_PATH = Path(__file__).parent / "data" / "synthetic_appointments.csv"
 OUTPUT_DIR = Path(__file__).parent / "outputs"
 ARTIFACT_DIR = Path(__file__).parent / "artifacts"
+ARTIFACT_PATH = ARTIFACT_DIR / "no_show_pipeline.joblib"
+ARTIFACT_METADATA_PATH = ARTIFACT_DIR / "no_show_pipeline.metadata.json"
+ML_DEPENDENCIES = ("joblib", "numpy", "pandas", "scikit-learn", "scipy")
 NUMERIC_FEATURES = ["days_ahead", "previous_no_shows"]
 CATEGORICAL_FEATURES = ["sms_reminder", "weekday"]
 FEATURE_NAMES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
@@ -156,6 +161,31 @@ def main() -> None:
     false_positives = confusion[0][1]
     false_negatives = confusion[1][0]
 
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(selected_model, ARTIFACT_PATH)
+    artifact_sha256 = hashlib.sha256(ARTIFACT_PATH.read_bytes()).hexdigest()
+    model_version = f"no-show-{artifact_sha256}"
+    artifact_metadata = {
+        "metadata_schema_version": 1,
+        "model_version": model_version,
+        "artifact_sha256": artifact_sha256,
+        "feature_names": FEATURE_NAMES,
+        "positive_class": 1,
+        "python_version": platform.python_version(),
+        "dependencies": {
+            dependency: importlib.metadata.version(dependency)
+            for dependency in ML_DEPENDENCIES
+        },
+    }
+    ARTIFACT_METADATA_PATH.write_text(
+        json.dumps(artifact_metadata, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    metadata_sha256 = hashlib.sha256(
+        ARTIFACT_METADATA_PATH.read_bytes()
+    ).hexdigest()
+
     split_sizes = {
         "train": len(train_features),
         "validation": len(validation_features),
@@ -168,7 +198,7 @@ def main() -> None:
         "test": class_distribution(test_target),
     }
     metadata = {
-        "model_version": MODEL_VERSION,
+        "model_version": model_version,
         "random_seed": SEED,
         "split_strategy": "Stratified 70% train, 15% validation, 15% test",
         "split_sizes": split_sizes,
@@ -194,11 +224,7 @@ def main() -> None:
         ),
     }
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    artifact_path = ARTIFACT_DIR / "no_show_pipeline.joblib"
     metrics_path = OUTPUT_DIR / "metrics.json"
-    joblib.dump(selected_model, artifact_path)
     metrics_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
     print(f"Split sizes: {split_sizes}")
@@ -213,7 +239,10 @@ def main() -> None:
         f"{false_negatives} false negatives."
     )
     print(metadata["accuracy_note"])
-    print(f"Saved fitted pipeline: {artifact_path}")
+    print(f"Saved fitted pipeline: {ARTIFACT_PATH}")
+    print(f"Saved artifact metadata: {ARTIFACT_METADATA_PATH}")
+    print(f"Trusted artifact SHA-256: {artifact_sha256}")
+    print(f"Trusted metadata SHA-256: {metadata_sha256}")
     print(f"Saved metrics and metadata: {metrics_path}")
 
 

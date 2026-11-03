@@ -1,0 +1,20 @@
+{
+  "metadata_schema_version": 1,
+  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "artifact_sha256": "4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "feature_names": [
+    "days_ahead",
+    "previous_no_shows",
+    "sms_reminder",
+    "weekday"
+  ],
+  "positive_class": 1,
+  "python_version": "3.13.17",
+  "dependencies": {
+    "joblib": "1.4.2",
+    "numpy": "2.5.4",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.5.2",
+    "scipy": "1.18.1"
+  }
+}
