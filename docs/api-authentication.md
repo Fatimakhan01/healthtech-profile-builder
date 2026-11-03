@@ -100,6 +100,7 @@ The saved pipeline currently returns this response for the example:
 ```json
 {
   "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "display_version": "No-Show Model v1",
   "predicted_class": 0,
   "predicted_label": "attended",
   "probability_no_show": 0.320676589796643,
@@ -107,9 +108,11 @@ The saved pipeline currently returns this response for the example:
 }
 ```
 
-The example version is the artifact SHA-256 prefixed with `no-show-`; retraining
-changes the version. Invalid or missing fields return `400`; missing or invalid
-authentication returns `401`, and authenticated users without the standard
+`model_version` is the artifact SHA-256 prefixed with `no-show-` and remains
+available for diagnostics. `display_version` is a human-readable training
+sequence label from the independently digest-verified metadata. Invalid or
+missing fields return `400`; missing or invalid authentication returns `401`,
+and authenticated users without the standard
 role are denied with `403`. If the artifact, its metadata, trusted digests, or
 inference is unavailable, the endpoint returns `503` with the generic body
 `{"detail":"The prediction model is temporarily unavailable."}`. The trusted

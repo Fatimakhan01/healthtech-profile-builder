@@ -1,6 +1,7 @@
 {
   "metadata_schema_version": 1,
   "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "display_version": "No-Show Model v1",
   "artifact_sha256": "4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
   "feature_names": [
     "days_ahead",

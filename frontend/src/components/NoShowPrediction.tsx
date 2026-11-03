@@ -11,6 +11,7 @@ type PredictionInput = {
 
 type PredictionResponse = {
   model_version: string;
+  display_version: string;
   predicted_label: "no_show" | "attended";
   probability_no_show: number;
   notice: string;
@@ -60,6 +61,7 @@ function isPredictionResponse(value: unknown): value is PredictionResponse {
   const response = value as Partial<PredictionResponse>;
   return (
     typeof response.model_version === "string" &&
+    typeof response.display_version === "string" &&
     (response.predicted_label === "no_show" ||
       response.predicted_label === "attended") &&
     typeof response.probability_no_show === "number" &&
@@ -329,7 +331,7 @@ export default function NoShowPrediction({
                   Model version
                 </dt>
                 <dd className="mt-1 text-sm font-semibold text-slate-900">
-                  {result.model_version}
+                  {result.display_version}
                 </dd>
               </div>
             </dl>
