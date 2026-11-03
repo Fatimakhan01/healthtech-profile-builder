@@ -508,3 +508,54 @@ class RealArtifactAuthenticatedIntegrationTests(TestCase):
         self.assertGreaterEqual(response.data["probability_no_show"], 0)
         self.assertLessEqual(response.data["probability_no_show"], 1)
         self.assertIn("synthetic", response.data["notice"])
+
+    def test_wrong_role_is_rejected(self):
+        user_model = get_user_model()
+        admin = user_model.objects.create_superuser(
+            email="prediction-admin@example.test",
+            password="test-password-for-prediction",
+        )
+        token = AccessToken.for_user(admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_authenticated_invalid_input_returns_bad_request(self):
+        user_model = get_user_model()
+        user = user_model.objects.create_user(
+            email="prediction-invalid@example.test",
+            password="test-password-for-prediction",
+        )
+        token = AccessToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        response = self.client.post(
+            self.url,
+            {**self.payload, "days_ahead": 61},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("days_ahead", response.data)
+
+    def test_authenticated_missing_artifact_returns_safe_server_error(self):
+        user_model = get_user_model()
+        user = user_model.objects.create_user(
+            email="prediction-missing-model@example.test",
+            password="test-password-for-prediction",
+        )
+        token = AccessToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        missing_artifact = Path(self.temp_dir.name) / "missing-pipeline.joblib"
+
+        with patch.object(views, "MODEL_PATH", missing_artifact):
+            views.load_pipeline.cache_clear()
+            response = self.client.post(self.url, self.payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(
+            response.data,
+            {"detail": "The prediction model is temporarily unavailable."},
+        )

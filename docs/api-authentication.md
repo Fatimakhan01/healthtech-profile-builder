@@ -99,7 +99,7 @@ The saved pipeline currently returns this response for the example:
 
 ```json
 {
-  "model_version": "no-show-v1",
+  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
   "predicted_class": 0,
   "predicted_label": "attended",
   "probability_no_show": 0.320676589796643,
@@ -107,12 +107,17 @@ The saved pipeline currently returns this response for the example:
 }
 ```
 
-Invalid or missing fields return `400`; missing or invalid authentication is
-rejected by the configured standard-user permission. If the artifact is
-unavailable or inference fails, the endpoint returns `503` with a generic
-message. The probability is learned from artificial labels and is not a
-calibrated or clinically validated real-world risk estimate. Do not use it to
-make clinical or appointment decisions.
+The example version is the artifact SHA-256 prefixed with `no-show-`; retraining
+changes the version. Invalid or missing fields return `400`; missing or invalid
+authentication returns `401`, and authenticated users without the standard
+role are denied with `403`. If the artifact, its metadata, trusted digests, or
+inference is unavailable, the endpoint returns `503` with the generic body
+`{"detail":"The prediction model is temporarily unavailable."}`. The trusted
+artifact and metadata digests are configured outside those replaceable files
+as `NO_SHOW_MODEL_SHA256` and `NO_SHOW_MODEL_METADATA_SHA256`. The probability
+is learned from artificial labels and is not a calibrated or clinically
+validated real-world risk estimate. Do not use it to make clinical or
+appointment decisions.
 
 ## Standard-user health profile API
 
