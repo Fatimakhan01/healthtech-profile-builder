@@ -130,27 +130,104 @@ Run the ML workflow from the repository root:
 
 ```powershell
 .\.venv-integration\Scripts\python.exe backend\ml\generate_data.py
-.\.venv-integration\Scripts\python.exe backend\ml\eda.py
 .\.venv-integration\Scripts\python.exe backend\ml\train.py
 .\.venv-integration\Scripts\python.exe backend\ml\evaluate.py
-.\.venv-integration\Scripts\python.exe backend\ml\diagnostics.py
-.\.venv-integration\Scripts\python.exe backend\ml\regularization_experiment.py
 ```
 
 `generate_data.py` replaces the synthetic CSV; `train.py` replaces the saved
-pipeline and `outputs/metrics.json`. Do not run those two commands if you need
-to preserve the current data and recorded results. The evaluation and
-diagnostic scripts and their output files are described in the [ML
-documentation](./backend/ml/README.md).
+pipeline, its metadata sidecar, and `outputs/metrics.json`. Do not run those
+commands if you need to preserve the current data and recorded results.
+`evaluate.py` loads the saved pipeline, prints train/validation and final test
+diagnostics, and does not write output files. See the [ML documentation](./backend/ml/README.md)
+for EDA, cross-validation, learning-curve, and regularization commands.
 
-To serve the no-show prediction endpoint, run Django with the integration
-environment (it contains the ML packages as well as the backend packages):
+After training, configure trusted SHA-256 values for both files in the
+environment that runs Django. From the repository root, PowerShell can
+calculate the current digests:
+
+```powershell
+$env:NO_SHOW_MODEL_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.joblib -Algorithm SHA256).Hash.ToLowerInvariant()
+$env:NO_SHOW_MODEL_METADATA_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.metadata.json -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+Provide these expected values through a trusted deployment configuration,
+independently of the replaceable files. Recalculate and update them after
+authorized retraining. The API verifies both values before loading the model.
+
+To serve the prediction endpoint, run Django with the integration environment
+(which includes ML and backend dependencies) in the same PowerShell session
+where the two digest variables are set:
 
 ```powershell
 Push-Location backend
 ..\.venv-integration\Scripts\python.exe manage.py runserver
 Pop-Location
 ```
+
+### Week 3 prediction API and demo checklist
+
+The prototype uses 2,000 locally generated synthetic appointment records. It
+is educational, not clinical, and does not represent actual appointments.
+The versioned Django endpoint is `POST /api/v1/predictions/no-show/` and
+requires an active standard-user access JWT. Anonymous requests return 401;
+authenticated users with another role are denied. Invalid input returns 400.
+If the artifact or its trusted digest/metadata verification is unavailable,
+the API returns HTTP 503 with the generic body
+`{"detail":"The prediction model is temporarily unavailable."}`.
+
+Example request (replace the bearer placeholder with a valid standard-user
+access JWT):
+
+```http
+POST http://127.0.0.1:8000/api/v1/predictions/no-show/
+Authorization: Bearer <standard-user-access-jwt>
+Content-Type: application/json
+
+{
+  "days_ahead": 14,
+  "previous_no_shows": 1,
+  "sms_reminder": "yes",
+  "weekday": "Wednesday"
+}
+```
+
+Example response from the saved artifact at follow-up commit `1b7b489`:
+
+```json
+{
+  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "predicted_class": 0,
+  "predicted_label": "attended",
+  "probability_no_show": 0.320676589796643,
+  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
+}
+```
+
+The model version is derived from the verified artifact SHA-256 and changes
+when the artifact changes. The example is illustrative; the API reference
+documents the current response contract.
+
+Demo checklist:
+
+- [ ] Signed-in standard user submits the example in the dashboard and sees a
+  result, model version, probability, and synthetic/non-clinical notice.
+- [ ] Send invalid JSON directly to Django (for example `days_ahead: 61`) and
+  confirm HTTP 400.
+- [ ] Send the valid request without a bearer token and confirm HTTP 401; send
+  it with an administrator token and confirm HTTP 403.
+- [ ] In a development-only Django process, configure a deliberately incorrect
+  trusted digest, restart the process, and confirm the dashboard displays the
+  generic unavailable response; restore the correct trusted values afterward.
+
+Automated API coverage is in `backend/predictions/tests.py`; run the focused
+command in the Verify section below. The automated authenticated test uses the
+saved model, and tests cover invalid input, anonymous access, wrong-role
+access, and unavailable artifacts. The checklist above is for manual
+demonstration; no manual UI run is claimed here.
+
+The mentor reviewed original Week 3 PR #2 at revision `1be90c1`; the Phase 1
+and Phase 2 follow-up implementation is at `1b7b489`. This README describes
+that reviewed follow-up state and is not evidence that a manual demo was run.
 
 ## Technology and architecture
 
@@ -281,34 +358,11 @@ See [docs/api-authentication.md](./docs/api-authentication.md) for full Django a
 The prediction UI is available to signed-in standard users in the dashboard.
 The browser posts to the same-origin Next.js route
 `/api/predictions/no-show/`, which proxies to Django
-`POST /api/v1/predictions/no-show/`. For example:
-
-```json
-{
-  "days_ahead": 14,
-  "previous_no_shows": 1,
-  "sms_reminder": "yes",
-  "weekday": "Wednesday"
-}
-```
-
-The current saved pipeline returns an illustrative synthetic response for
-those inputs:
-
-```json
-{
-  "model_version": "no-show-v1",
-  "predicted_class": 0,
-  "predicted_label": "attended",
-  "probability_no_show": 0.320676589796643,
-  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
-}
-```
-
-These are model outputs for fictional data, not predictions about a real
-appointment. They are not clinically validated or suitable for healthcare or
-appointment decisions. Input validation, authentication, and error responses
-are documented in the [API reference](./docs/api-authentication.md).
+`POST /api/v1/predictions/no-show/`. It uses fictional synthetic records and
+is educational only, not a clinical tool or a real appointment-risk estimate.
+The [Week 3 API and demo checklist](#week-3-prediction-api-and-demo-checklist)
+contains the request/response example, authentication and failure behavior.
+See the [API reference](./docs/api-authentication.md) for the full contract.
 
 ## Verify
 

@@ -1,8 +1,8 @@
 # AI-assisted development workflow
 
 **Project:** HealthProfile
-**Evidence focus:** Week 2 mentor-review follow-up fixes (Issues 1, 2 and 3), plus the retained earlier project history
-**Last updated:** 2026-10-27
+**Evidence focus:** Week 2 and Week 3 mentor-review follow-up work, plus the retained earlier project history
+**Last updated:** 2026-11-03
 
 ## 1. Scope and evidence
 
@@ -11,7 +11,7 @@ This note records AI-assisted work on the HealthProfile project that is supporte
 - The complete verbatim prompts from earlier project phases were not retained in the available context and are not quoted here.
 - The two Week 2 coding prompts (Issue 1 and Issue 2) are recorded in full in Section 3.
 - The original formal assignment file and any rubric were not found in the repository or retained context. Rubric-specific requirements must be confirmed against the original assignment source.
-- Test results are reported from the implementation turns that produced them. The documentation author did **not** run any tests or checks while preparing this documentation. Historical results are not presented as rerun, with one exception: on 2026-10-27 the developer ran the focused admin API tests, the full backend suite, and the Django system check (Section 5.3). Frontend lint/build and `git diff --check` results have not been rerun.
+- Historical test results are attributed to their original runs. On 2026-10-27 the developer ran the focused admin API tests, the full backend suite, and the Django system check (Section 5.3). On 2026-11-03 the AI assistant ran the focused Week 3 prediction API suite and `git diff --check` for the Phase 3 documentation/test update (Section 3.5).
 - Automated checks, manual verification, and pending work are kept distinct throughout. Nothing pending is marked complete.
 - The developer reported manual checks of the Week 2 fixes on 2026-10-27 (Sections 3.1, 3.2 and 3.4): the Issue 1 `is_active` database transitions and the Issue 2 pagination scenario. The developer has not separately confirmed a manual check that repeated-status requests create no extra audit event; that behavior is covered only by the automated tests. Exact steps, environment, and screenshots were not retained. Manual checks are separate from the automated test results (Section 5.3 for the 2026-10-27 backend run).
 - The developer personally reviewed the source-code changes for Issues 1, 2 and 3 and confirmed on 2026-10-27 that they look correct. This is a developer-reported manual review; no findings or review notes were retained, and the documentation author did not access the repository.
@@ -322,6 +322,60 @@ Completed for the scenario above (developer-reported). Only this delayed-respons
 | Issue 3 manual browser test (Chrome DevTools, delayed Ayesha response then Fatima search) | **Completed** (developer-reported) | Fatima's results stayed on screen after the delayed Ayesha response completed; temporary test hook not committed |
 | Issue 3 automated frontend race-condition test | **None added** | No frontend automated test framework available; not claimed |
 | Issue 3 out-of-order admin directory responses | Implemented per developer report in `frontend/src/app/admin/page.tsx`; developer's source diff review completed 2026-10-27 | Separate from Issue 2; mentor concern: out-of-order responses can overwrite newer results when search or filters change quickly |
+
+### 3.5 Week 3 mentor follow-up
+
+The mentor reviewed the original Week 3 implementation in PR #2 at commit
+`1be90c1` (full revision
+`1be90c16884f91b934671c6e0048ac52bbda237e`). The follow-up work is on
+`week3-followup`; the Phase 1/2 implementation commit is `1b7b489`.
+
+#### Prompt refinement and implementation choices
+
+The retained conversation contains the phase-specific requests; this summary
+does not invent a separate prompt transcript:
+
+- Phase 1 narrowed the artifact concern to metadata tied to the saved
+  pipeline, a trusted digest checked before deserialization, strict schema and
+  probability validation, safe unavailable responses, and authenticated
+  real-artifact test coverage.
+- Phase 2 explicitly limited evaluation changes to the evaluator and ML
+  README, required test-set FP/FN groups by lead time and reminder category,
+  kept threshold comparisons on validation, and prohibited retraining or
+  output-file changes.
+- Phase 3 requested documentation and evidence readiness, with automated
+  coverage for the direct API and no fabricated manual-demo claims.
+
+Implementation choices followed those boundaries: the Phase 1 loader checks
+trusted artifact and metadata SHA-256 values before `joblib.load`; Phase 2
+adds descriptive test-set group counts at the existing `predict()` behavior;
+Phase 3 documents the actual routes, version format, and test/demo status.
+No model, dataset, API behavior, or frontend code was changed for Phase 3.
+
+#### Debugging and verification evidence
+
+During Phase 1 test development, an authenticated test initially used a
+plain Django `Client`, which does not provide DRF's `.credentials()` helper.
+The test was changed to use `APIClient`; the focused prediction suite then
+passed. This was a test-harness correction, not an application authentication
+change.
+
+For Phase 3, the developer requested this documentation/test scope. The AI
+assistant inspected the API permission and serializer, added automated
+wrong-role coverage, and updated the README, API reference, and this workflow
+record. The command
+`Push-Location backend; ..\.venv-integration\Scripts\python.exe manage.py test predictions.tests --verbosity 1; Pop-Location`
+passed all 23 prediction tests with no Django system-check issues. This run
+included authenticated real-artifact prediction, authenticated invalid input
+(400), anonymous access (401), wrong-role access (403), and authenticated
+missing-artifact handling (503). `git diff --check` was also run for this
+change. These are automated results, not browser or manual-demo results. The
+developer's independent review of these Phase 3 changes remains pending.
+
+The demo checklist in the root README is a set of steps still to perform
+manually. There is no retained screenshot or evidence of a manual Week 3 UI
+demo, so none is claimed. Automated API test coverage and any manual
+demonstration must remain distinguished.
 
 ## 4. Human review and security boundaries
 

@@ -38,6 +38,16 @@ learnable demonstration; they do not represent established effects or
 healthcare evidence. Feature distributions and target balance are also
 synthetic.
 
+The 2,000 locally generated records contain 976 no-shows (48.8%), so this
+dataset is nearly balanced. That prevalence is a property of the generator,
+not an estimate of clinic prevalence. Real clinics may have substantially
+different no-show rates, and these metrics do not establish how a model would
+perform at those rates. The assumed logistic-style relationships among
+`days_ahead`, `previous_no_shows`, `sms_reminder`, `weekday`, and the target
+are educational assumptions, not findings from real patient data. Results
+must not be interpreted as clinical evidence or proof of real-world
+predictive performance.
+
 ## Requirements and commands
 
 The ML environment and prediction API tests use Python 3.13.17 in
@@ -72,6 +82,26 @@ without writing files; `diagnostics.py` writes
 and `train.py` replaces the model and metrics, so omit those commands when
 preserving the existing artifacts.
 
+Training also writes `artifacts/no_show_pipeline.metadata.json`, recording
+the artifact-derived model version, SHA-256, feature order, positive class,
+Python version, and ML dependency versions. Before serving predictions, set
+`NO_SHOW_MODEL_SHA256` and `NO_SHOW_MODEL_METADATA_SHA256` in the Django
+process environment from a trusted deployment configuration. After an
+authorized retraining, update both values from the new files, for example in
+PowerShell from the repository root:
+
+```powershell
+$env:NO_SHOW_MODEL_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.joblib -Algorithm SHA256).Hash.ToLowerInvariant()
+$env:NO_SHOW_MODEL_METADATA_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.metadata.json -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+Keep these expected digests outside the replaceable artifact and metadata
+files; deploy them through the trusted environment/configuration mechanism.
+The loader verifies both digests before deserializing the pipeline and rejects
+metadata with an incompatible feature schema, Python version, or dependency
+versions. Restart Django after updating the artifact or digest configuration
+so the in-process model cache is cleared.
+
 ## Modeling and reproducibility
 
 Seed `42` is used for data generation and the stratified train/validation/test
@@ -81,28 +111,43 @@ scaling for numeric features; most-frequent imputation and one-hot encoding
 for categorical features) is fitted only on the training data.
 
 The training script compares a most-frequent `DummyClassifier` baseline with
-logistic regression on validation F1-score. It selects the higher-F1 pipeline
-(ties favor the baseline), evaluates that selected model once on the held-out
-test set, and reports accuracy, precision, recall, F1-score, confusion matrix,
-and ROC-AUC when both test classes are present. It also reports false-positive
-and false-negative counts. Accuracy alone can be misleading if class
-frequencies differ: a model can appear accurate by favoring the more common
-class while missing many cases in the other class. The training script records
-the observed class distributions and model metrics in `outputs/metrics.json`
-when run. The generated dataset currently contains 1,024 attended records
-(51.2%) and 976 no-show records (48.8%); this count was checked from the
-generated CSV and is not a model result. Validation and test metrics are
-recorded in `outputs/metrics.json`.
+logistic regression on validation binary F1. The Logistic Regression uses
+scikit-learn's default `predict()` decision threshold of 0.5. Model selection
+uses validation F1 at that default behavior; training does not tune or select
+another threshold. It evaluates the selected model once on the held-out test
+set and records accuracy, precision, recall, F1-score, confusion matrix,
+ROC-AUC, and aggregate false-positive and false-negative counts in
+`outputs/metrics.json`. Accuracy alone can be misleading: a model may favor a
+more common class while missing cases in the other class.
 
-`evaluate.py` reconstructs the same seeded, stratified 70/15/15 split and loads
-the saved pipeline without fitting or saving a model. It reports metrics at
-fixed classification thresholds on validation data only, then reports ROC-AUC,
-Brier scores, and calibration-bin counts on the test data as final evaluation.
-The test results must not be used to select a threshold. A lower threshold
-typically flags more records, increasing recall while also increasing false
-positives; a higher threshold typically reduces flags and false positives but
-misses more positive cases. These diagnostics describe only the synthetic
-dataset and do not establish real-world validity or proven calibration.
+`evaluate.py` reconstructs the same seeded, stratified split (1,400 train,
+300 validation, 300 test) and loads the saved pipeline without fitting or
+saving models or outputs. Its train and validation classification metrics use
+the saved model's `predict()` behavior. The fixed-threshold comparison uses
+validation probabilities only; it reports thresholds 0.30-0.70 and does not
+automatically choose one. Lower thresholds generally flag more records,
+increasing recall and false positives; higher thresholds generally reduce
+flags and false positives while missing more positive cases. The current
+Logistic Regression's default decision threshold remains 0.5.
+
+The test split is reserved for final evaluation. `evaluate.py` reports test
+ROC-AUC, Brier score, prevalence-baseline Brier score, calibration-bin counts,
+and subgroup error counts using the saved pipeline's existing predictions
+(Logistic Regression's default threshold of 0.5). Subgroups are lead-time
+bands `0-14`, `15-29`, `30-44`, and `45-60` days, plus `sms_reminder=yes` and
+`sms_reminder=no`. Each group reports total records, actual no-shows, predicted
+no-shows, false positives, and false negatives. These counts describe the
+held-out synthetic test split only; they are not used to select a model or
+threshold.
+
+A false positive is an attended synthetic record predicted as a no-show; a
+false negative is a synthetic no-show predicted as attended. Both matter:
+false alarms can cause unnecessary follow-up, while misses fail to flag
+positive examples. The dataset does not measure consequences for actual
+patients. Subgroup counts can be small and unstable, so differences are
+descriptive only; they do not establish bias, causation, fairness, or
+real-world performance. No threshold, model, or clinical decision should be
+selected from the test subgroup results.
 
 `diagnostics.py` uses a fixed-seed, 5-fold stratified cross-validation and
 learning curve on the training partition only. Preprocessing remains inside
