@@ -15,6 +15,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
+from ml import train as ml_train
+
 from . import views
 from .views import DEPENDENCIES, FEATURE_NAMES, ModelArtifactUnavailable
 
@@ -68,6 +70,7 @@ def build_metadata(artifact_digest, feature_names=None):
     return {
         "metadata_schema_version": 1,
         "model_version": f"no-show-{artifact_digest}",
+        "display_version": "No-Show Model v1",
         "artifact_sha256": artifact_digest,
         "feature_names": list(feature_names or FEATURE_NAMES),
         "positive_class": 1,
@@ -103,7 +106,11 @@ class NoShowPredictionApiTests(SimpleTestCase):
         "predictions.views.load_pipeline",
         return_value=(
             FakePipeline(),
-            {"model_version": "test-no-show-version", "positive_class": 1},
+            {
+                "model_version": "test-no-show-version",
+                "display_version": "No-Show Model v1",
+                "positive_class": 1,
+            },
         ),
     )
     def test_valid_request_returns_synthetic_prediction(
@@ -115,6 +122,7 @@ class NoShowPredictionApiTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["model_version"], "test-no-show-version")
+        self.assertEqual(response.data["display_version"], "No-Show Model v1")
         self.assertEqual(response.data["predicted_class"], 1)
         self.assertEqual(response.data["predicted_label"], "no_show")
         self.assertEqual(response.data["probability_no_show"], 0.73)
@@ -164,7 +172,11 @@ class NoShowPredictionApiTests(SimpleTestCase):
         "predictions.views.load_pipeline",
         return_value=(
             FakePipeline(),
-            {"model_version": "test-no-show-version", "positive_class": 1},
+            {
+                "model_version": "test-no-show-version",
+                "display_version": "No-Show Model v1",
+                "positive_class": 1,
+            },
         ),
     )
     def test_response_contains_class_label_probability_and_notice(
@@ -178,6 +190,7 @@ class NoShowPredictionApiTests(SimpleTestCase):
             set(response.data),
             {
                 "model_version",
+                "display_version",
                 "predicted_class",
                 "predicted_label",
                 "probability_no_show",
@@ -191,7 +204,11 @@ class NoShowPredictionApiTests(SimpleTestCase):
         "predictions.views.load_pipeline",
         return_value=(
             PipelineWithInvalidProbabilities(),
-            {"model_version": "test-no-show-version", "positive_class": 1},
+            {
+                "model_version": "test-no-show-version",
+                "display_version": "No-Show Model v1",
+                "positive_class": 1,
+            },
         ),
     )
     def test_invalid_probability_output_returns_safe_server_error(
@@ -217,7 +234,11 @@ class NoShowPredictionApiTests(SimpleTestCase):
                 "predictions.views.load_pipeline",
                 return_value=(
                     PipelineWithReorderedClasses(),
-                    {"model_version": "test-no-show-version", "positive_class": 1},
+                    {
+                        "model_version": "test-no-show-version",
+                        "display_version": "No-Show Model v1",
+                        "positive_class": 1,
+                    },
                 ),
             ),
         ):
@@ -243,6 +264,7 @@ class NoShowPredictionApiTests(SimpleTestCase):
                             model,
                             {
                                 "model_version": "test-no-show-version",
+                                "display_version": "No-Show Model v1",
                                 "positive_class": 1,
                             },
                         ),
@@ -399,6 +421,32 @@ class ModelArtifactValidationTests(SimpleTestCase):
 
         self.assert_safe_unavailable(self.post_prediction())
 
+    def test_missing_display_version_returns_safe_server_error(self):
+        artifact_digest = self.write_bundle()
+        metadata = build_metadata(artifact_digest)
+        del metadata["display_version"]
+        metadata_bytes = json.dumps(metadata).encode("utf-8")
+        self.metadata_path.write_bytes(metadata_bytes)
+        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
+            metadata_bytes
+        ).hexdigest()
+        views.load_pipeline.cache_clear()
+
+        self.assert_safe_unavailable(self.post_prediction())
+
+    def test_invalid_display_version_returns_safe_server_error(self):
+        artifact_digest = self.write_bundle()
+        metadata = build_metadata(artifact_digest)
+        metadata["display_version"] = "No-Show Model v0"
+        metadata_bytes = json.dumps(metadata).encode("utf-8")
+        self.metadata_path.write_bytes(metadata_bytes)
+        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
+            metadata_bytes
+        ).hexdigest()
+        views.load_pipeline.cache_clear()
+
+        self.assert_safe_unavailable(self.post_prediction())
+
     def test_incompatible_dependency_metadata_returns_safe_server_error(self):
         artifact_digest = self.write_bundle()
         metadata = build_metadata(artifact_digest)
@@ -504,6 +552,7 @@ class RealArtifactAuthenticatedIntegrationTests(TestCase):
             response.data["model_version"],
             f"no-show-{expected_digest}",
         )
+        self.assertEqual(response.data["display_version"], "No-Show Model v1")
         self.assertIn("predicted_class", response.data)
         self.assertGreaterEqual(response.data["probability_no_show"], 0)
         self.assertLessEqual(response.data["probability_no_show"], 1)
@@ -559,3 +608,59 @@ class RealArtifactAuthenticatedIntegrationTests(TestCase):
             response.data,
             {"detail": "The prediction model is temporarily unavailable."},
         )
+
+
+class ModelDisplayVersionGenerationTests(SimpleTestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        root = Path(self.temp_dir.name)
+        artifact_path = root / "pipeline.joblib"
+        metadata_path = root / "pipeline.metadata.json"
+        patcher = patch.multiple(
+            ml_train,
+            ARTIFACT_PATH=artifact_path,
+            ARTIFACT_METADATA_PATH=metadata_path,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.artifact_path = artifact_path
+        self.metadata_path = metadata_path
+
+    def write_previous_metadata(self, display_version=None):
+        digest = "a" * 64
+        metadata = {
+            "metadata_schema_version": 1,
+            "model_version": f"no-show-{digest}",
+            "artifact_sha256": digest,
+        }
+        if display_version is not None:
+            metadata["display_version"] = display_version
+        self.metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    def test_first_training_starts_at_v1(self):
+        self.assertEqual(ml_train.next_display_version(), "No-Show Model v1")
+
+    def test_legacy_metadata_advances_to_v2(self):
+        self.write_previous_metadata()
+
+        self.assertEqual(ml_train.next_display_version(), "No-Show Model v2")
+
+    def test_retraining_advances_saved_version_from_v1_to_v2_to_v3(self):
+        self.write_previous_metadata("No-Show Model v1")
+        self.assertEqual(ml_train.next_display_version(), "No-Show Model v2")
+
+        self.write_previous_metadata("No-Show Model v2")
+        self.assertEqual(ml_train.next_display_version(), "No-Show Model v3")
+
+    def test_invalid_previous_version_refuses_to_reset_counter(self):
+        self.write_previous_metadata("No-Show Model v0")
+
+        with self.assertRaises(RuntimeError):
+            ml_train.next_display_version()
+
+    def test_missing_metadata_for_existing_artifact_refuses_to_reset_counter(self):
+        self.artifact_path.write_bytes(b"existing artifact")
+
+        with self.assertRaises(RuntimeError):
+            ml_train.next_display_version()

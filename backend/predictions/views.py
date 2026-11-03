@@ -66,6 +66,7 @@ def _validate_metadata(metadata, expected_artifact_digest):
     required_fields = {
         "metadata_schema_version",
         "model_version",
+        "display_version",
         "artifact_sha256",
         "feature_names",
         "positive_class",
@@ -85,6 +86,14 @@ def _validate_metadata(metadata, expected_artifact_digest):
         raise ModelArtifactUnavailable("Artifact model version is invalid.")
     if metadata["model_version"] != f"no-show-{expected_artifact_digest}":
         raise ModelArtifactUnavailable("Artifact version is not bound to its digest.")
+    if (
+        not isinstance(metadata["display_version"], str)
+        or not re.fullmatch(
+            r"No-Show Model v[1-9][0-9]*",
+            metadata["display_version"],
+        )
+    ):
+        raise ModelArtifactUnavailable("Artifact display version is invalid.")
     if metadata["feature_names"] != list(FEATURE_NAMES):
         raise ModelArtifactUnavailable("Artifact feature schema does not match.")
     if type(metadata["positive_class"]) is not int or metadata["positive_class"] != 1:
@@ -212,6 +221,7 @@ class NoShowPredictionView(APIView):
         return Response(
             {
                 "model_version": metadata["model_version"],
+                "display_version": metadata["display_version"],
                 "predicted_class": predicted_class,
                 "predicted_label": "no_show" if predicted_class == 1 else "attended",
                 "probability_no_show": probability_no_show,

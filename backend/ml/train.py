@@ -4,6 +4,7 @@ import hashlib
 import importlib.metadata
 import json
 import platform
+import re
 from pathlib import Path
 
 import joblib
@@ -36,6 +37,62 @@ NUMERIC_FEATURES = ["days_ahead", "previous_no_shows"]
 CATEGORICAL_FEATURES = ["sms_reminder", "weekday"]
 FEATURE_NAMES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 TARGET = "no_show"
+DISPLAY_VERSION_PATTERN = re.compile(r"^No-Show Model v([1-9][0-9]*)$")
+
+
+def next_display_version() -> str:
+    if not ARTIFACT_METADATA_PATH.exists():
+        if ARTIFACT_PATH.exists():
+            raise RuntimeError(
+                "Existing model artifact has no metadata; refusing to reset "
+                "its display version."
+            )
+        return "No-Show Model v1"
+
+    try:
+        previous_metadata = json.loads(
+            ARTIFACT_METADATA_PATH.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            "Cannot determine the next model display version from metadata."
+        ) from error
+
+    if not isinstance(previous_metadata, dict):
+        raise RuntimeError("Existing model metadata is invalid.")
+    if (
+        type(previous_metadata.get("metadata_schema_version")) is not int
+        or previous_metadata["metadata_schema_version"] != 1
+    ):
+        raise RuntimeError("Existing model metadata schema is unsupported.")
+
+    artifact_digest = previous_metadata.get("artifact_sha256")
+    if (
+        not isinstance(artifact_digest, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", artifact_digest)
+        or previous_metadata.get("model_version") != f"no-show-{artifact_digest}"
+    ):
+        raise RuntimeError("Existing model metadata is not bound to its artifact.")
+    if ARTIFACT_PATH.exists():
+        existing_artifact_digest = hashlib.sha256(
+            ARTIFACT_PATH.read_bytes()
+        ).hexdigest()
+        if existing_artifact_digest != artifact_digest:
+            raise RuntimeError("Existing model metadata does not match its artifact.")
+
+    if "display_version" not in previous_metadata:
+        previous_version_number = 1
+    else:
+        match = DISPLAY_VERSION_PATTERN.fullmatch(
+            previous_metadata["display_version"]
+            if isinstance(previous_metadata["display_version"], str)
+            else ""
+        )
+        if match is None:
+            raise RuntimeError("Existing model display version is invalid.")
+        previous_version_number = int(match.group(1))
+
+    return f"No-Show Model v{previous_version_number + 1}"
 
 
 def make_preprocessor() -> ColumnTransformer:
@@ -163,12 +220,14 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    display_version = next_display_version()
     joblib.dump(selected_model, ARTIFACT_PATH)
     artifact_sha256 = hashlib.sha256(ARTIFACT_PATH.read_bytes()).hexdigest()
     model_version = f"no-show-{artifact_sha256}"
     artifact_metadata = {
         "metadata_schema_version": 1,
         "model_version": model_version,
+        "display_version": display_version,
         "artifact_sha256": artifact_sha256,
         "feature_names": FEATURE_NAMES,
         "positive_class": 1,

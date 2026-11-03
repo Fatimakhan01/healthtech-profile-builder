@@ -196,6 +196,7 @@ Example response from the saved artifact at follow-up commit `1b7b489`:
 ```json
 {
   "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+  "display_version": "No-Show Model v1",
   "predicted_class": 0,
   "predicted_label": "attended",
   "probability_no_show": 0.320676589796643,
