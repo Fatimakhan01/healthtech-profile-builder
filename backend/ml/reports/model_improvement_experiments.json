@@ -1,0 +1,332 @@
+{
+  "experiment": "Dummy baseline and Logistic Regression class-weight/threshold variants",
+  "random_seed": 42,
+  "split_strategy": "Stratified 70% train, 15% validation, 15% test; test not accessed",
+  "split_sizes": {
+    "train": 1400,
+    "validation": 300
+  },
+  "training_oof_threshold_selection": {
+    "method": "StratifiedKFold",
+    "n_splits": 5,
+    "shuffle": true,
+    "random_state": 42,
+    "training_partition_only": true,
+    "selection_metric": "F1"
+  },
+  "forest_search_assessment": "The existing eight-combination Random Forest search is retained; no additional forest search was run.",
+  "candidates": {
+    "LogisticRegression": {
+      "source": "Existing original model_comparison.json",
+      "threshold": 0.5,
+      "validation": {
+        "accuracy": 0.6433333333333333,
+        "precision": 0.4126984126984127,
+        "recall": 0.611764705882353,
+        "f1_score": 0.4928909952606635,
+        "roc_auc": 0.6667578659370724,
+        "average_precision": 0.5073105356411174,
+        "confusion_matrix": [
+          [
+            141,
+            74
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    },
+    "RandomForestClassifier": {
+      "source": "Existing original model_comparison.json",
+      "threshold": 0.5,
+      "validation": {
+        "accuracy": 0.73,
+        "precision": 0.5909090909090909,
+        "recall": 0.15294117647058825,
+        "f1_score": 0.24299065420560748,
+        "roc_auc": 0.5836114911080711,
+        "average_precision": 0.3826669319421408,
+        "confusion_matrix": [
+          [
+            206,
+            9
+          ],
+          [
+            72,
+            13
+          ]
+        ]
+      }
+    },
+    "GradientBoostingClassifier": {
+      "source": "Existing original model_comparison.json",
+      "threshold": 0.5,
+      "validation": {
+        "accuracy": 0.7233333333333334,
+        "precision": 0.5454545454545454,
+        "recall": 0.1411764705882353,
+        "f1_score": 0.22429906542056074,
+        "roc_auc": 0.6152667578659371,
+        "average_precision": 0.449737106244227,
+        "confusion_matrix": [
+          [
+            205,
+            10
+          ],
+          [
+            73,
+            12
+          ]
+        ]
+      }
+    },
+    "TunedRandomForestClassifier": {
+      "source": "Existing original model_comparison.json",
+      "threshold": 0.5,
+      "validation": {
+        "accuracy": 0.7066666666666667,
+        "precision": 0.47619047619047616,
+        "recall": 0.35294117647058826,
+        "f1_score": 0.40540540540540543,
+        "roc_auc": 0.6271956224350206,
+        "average_precision": 0.43792981043835116,
+        "confusion_matrix": [
+          [
+            182,
+            33
+          ],
+          [
+            55,
+            30
+          ]
+        ]
+      }
+    },
+    "DummyClassifier": {
+      "source": "Fitted on the experiment training split",
+      "parameters": {
+        "strategy": "most_frequent"
+      },
+      "threshold": 0.5,
+      "validation": {
+        "accuracy": 0.7166666666666667,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "roc_auc": 0.5,
+        "average_precision": 0.2833333333333333,
+        "confusion_matrix": [
+          [
+            215,
+            0
+          ],
+          [
+            85,
+            0
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_unweighted_default_0_5": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": null,
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.5,
+      "threshold_selection": "Default predict_proba threshold",
+      "training_oof_f1_at_selected_threshold": null,
+      "validation": {
+        "accuracy": 0.74,
+        "precision": 0.7333333333333333,
+        "recall": 0.12941176470588237,
+        "f1_score": 0.22,
+        "roc_auc": 0.6683447332421341,
+        "average_precision": 0.5056171723485468,
+        "confusion_matrix": [
+          [
+            211,
+            4
+          ],
+          [
+            74,
+            11
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_unweighted_training_oof_f1": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": null,
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.2875614121865991,
+      "threshold_selection": "Max F1 on 5-fold out-of-fold training probabilities",
+      "training_oof_f1_at_selected_threshold": {
+        "f1_score": 0.49209486166007904,
+        "precision": 0.4068627450980392,
+        "recall": 0.6225
+      },
+      "validation": {
+        "accuracy": 0.6366666666666667,
+        "precision": 0.40625,
+        "recall": 0.611764705882353,
+        "f1_score": 0.48826291079812206,
+        "roc_auc": 0.6683447332421341,
+        "average_precision": 0.5056171723485468,
+        "confusion_matrix": [
+          [
+            139,
+            76
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_moderate_positive_weight_default_0_5": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": {
+          "0": 1.0,
+          "1": 1.5
+        },
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.5,
+      "threshold_selection": "Default predict_proba threshold",
+      "training_oof_f1_at_selected_threshold": null,
+      "validation": {
+        "accuracy": 0.7366666666666667,
+        "precision": 0.5625,
+        "recall": 0.3176470588235294,
+        "f1_score": 0.40601503759398494,
+        "roc_auc": 0.6676333789329685,
+        "average_precision": 0.5043839259729734,
+        "confusion_matrix": [
+          [
+            194,
+            21
+          ],
+          [
+            58,
+            27
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_moderate_positive_weight_training_oof_f1": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": {
+          "0": 1.0,
+          "1": 1.5
+        },
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.3817003659507062,
+      "threshold_selection": "Max F1 on 5-fold out-of-fold training probabilities",
+      "training_oof_f1_at_selected_threshold": {
+        "f1_score": 0.49252243270189433,
+        "precision": 0.4096185737976783,
+        "recall": 0.6175
+      },
+      "validation": {
+        "accuracy": 0.65,
+        "precision": 0.41935483870967744,
+        "recall": 0.611764705882353,
+        "f1_score": 0.49760765550239233,
+        "roc_auc": 0.6676333789329685,
+        "average_precision": 0.5043839259729734,
+        "confusion_matrix": [
+          [
+            143,
+            72
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_balanced_default_0_5": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": "balanced",
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.5,
+      "threshold_selection": "Default predict_proba threshold",
+      "training_oof_f1_at_selected_threshold": null,
+      "validation": {
+        "accuracy": 0.6433333333333333,
+        "precision": 0.4126984126984127,
+        "recall": 0.611764705882353,
+        "f1_score": 0.4928909952606635,
+        "roc_auc": 0.6667578659370724,
+        "average_precision": 0.5073105356411174,
+        "confusion_matrix": [
+          [
+            141,
+            74
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    },
+    "LogisticRegression_balanced_training_oof_f1": {
+      "source": "Fitted on experiment training split",
+      "parameters": {
+        "class_weight": "balanced",
+        "max_iter": 1000,
+        "random_state": 42
+      },
+      "threshold": 0.49930644591400597,
+      "threshold_selection": "Max F1 on 5-fold out-of-fold training probabilities",
+      "training_oof_f1_at_selected_threshold": {
+        "f1_score": 0.49122807017543857,
+        "precision": 0.402555910543131,
+        "recall": 0.63
+      },
+      "validation": {
+        "accuracy": 0.6333333333333333,
+        "precision": 0.40310077519379844,
+        "recall": 0.611764705882353,
+        "f1_score": 0.48598130841121495,
+        "roc_auc": 0.6667578659370724,
+        "average_precision": 0.5073105356411174,
+        "confusion_matrix": [
+          [
+            138,
+            77
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    }
+  },
+  "selection_metric": "validation F1",
+  "selected_candidate": "LogisticRegression_moderate_positive_weight_training_oof_f1",
+  "selected_f1_delta_vs_original_logistic_regression": 0.004716660241728843,
+  "interpretation": "The top validation candidate is selected for comparison only. A small single-split F1 difference is not evidence of a robust improvement; retain the original Logistic Regression pipeline.",
+  "original_pipeline_action": "Preserved; no artifact was replaced.",
+  "test_metrics": null,
+  "test_usage": "The test partition was not used for fitting, threshold selection, comparison, or reporting."
+}

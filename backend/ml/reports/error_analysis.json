@@ -1,0 +1,303 @@
+{
+  "model": "saved LogisticRegression pipeline",
+  "split": "test",
+  "split_size": 300,
+  "prediction_rule": "Saved pipeline predict() at its default decision threshold.",
+  "positive_class": "no_show=1",
+  "confusion_matrix": {
+    "labels": [
+      0,
+      1
+    ],
+    "rows": [
+      "actual_attended_0",
+      "actual_no_show_1"
+    ],
+    "columns": [
+      "predicted_attended_0",
+      "predicted_no_show_1"
+    ],
+    "counts": [
+      [
+        144,
+        70
+      ],
+      [
+        42,
+        44
+      ]
+    ]
+  },
+  "false_positives": {
+    "count": 70,
+    "percent_of_test_set": 23.333333333333332,
+    "percent_of_actual_class": 32.71028037383178,
+    "feature_patterns": {
+      "record_count": 70,
+      "features": {
+        "days_ahead": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 67,
+          "missing_count": 3,
+          "mean": 40.985074626865675,
+          "median": 45.0
+        },
+        "previous_appointments": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 70,
+          "missing_count": 0,
+          "mean": 3.5285714285714285,
+          "median": 3.0
+        },
+        "previous_no_shows": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 70,
+          "missing_count": 0,
+          "mean": 1.2,
+          "median": 1.0
+        },
+        "appointment_hour": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 68,
+          "missing_count": 2,
+          "mean": 12.705882352941176,
+          "median": 13.0
+        },
+        "distance_km": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 67,
+          "missing_count": 3,
+          "mean": 11.787164179104478,
+          "median": 11.0
+        },
+        "portal_activity": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 67,
+          "missing_count": 3,
+          "mean": 1.6417910447761195,
+          "median": 2.0
+        },
+        "engagement_score": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 68,
+          "missing_count": 2,
+          "mean": 62.02970588235295,
+          "median": 60.235
+        },
+        "sms_reminder": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 70,
+          "missing_count": 0,
+          "mean": 0.6,
+          "median": 1.0
+        },
+        "weekday": {
+          "type": "categorical",
+          "non_missing_count": 68,
+          "missing_count": 2,
+          "category_proportions": {
+            "Friday": 0.10294117647058823,
+            "Monday": 0.20588235294117646,
+            "Saturday": 0.16176470588235295,
+            "Sunday": 0.08823529411764706,
+            "Thursday": 0.16176470588235295,
+            "Tuesday": 0.17647058823529413,
+            "Wednesday": 0.10294117647058823
+          }
+        },
+        "appointment_type": {
+          "type": "categorical",
+          "non_missing_count": 70,
+          "missing_count": 0,
+          "category_proportions": {
+            "consultation": 0.14285714285714285,
+            "follow_up": 0.3,
+            "procedure": 0.08571428571428572,
+            "routine": 0.4714285714285714
+          }
+        }
+      }
+    }
+  },
+  "false_negatives": {
+    "count": 42,
+    "percent_of_test_set": 14.0,
+    "percent_of_actual_class": 48.83720930232558,
+    "feature_patterns": {
+      "record_count": 42,
+      "features": {
+        "days_ahead": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 39,
+          "missing_count": 3,
+          "mean": 25.128205128205128,
+          "median": 22.0
+        },
+        "previous_appointments": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 42,
+          "missing_count": 0,
+          "mean": 3.238095238095238,
+          "median": 3.0
+        },
+        "previous_no_shows": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 42,
+          "missing_count": 0,
+          "mean": 0.4523809523809524,
+          "median": 0.0
+        },
+        "appointment_hour": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 41,
+          "missing_count": 1,
+          "mean": 13.121951219512194,
+          "median": 13.0
+        },
+        "distance_km": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 40,
+          "missing_count": 2,
+          "mean": 11.471,
+          "median": 8.815000000000001
+        },
+        "portal_activity": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 41,
+          "missing_count": 1,
+          "mean": 2.2195121951219514,
+          "median": 2.0
+        },
+        "engagement_score": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 36,
+          "missing_count": 6,
+          "mean": 63.2825,
+          "median": 61.28
+        },
+        "sms_reminder": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 40,
+          "missing_count": 2,
+          "mean": 0.65,
+          "median": 1.0
+        },
+        "weekday": {
+          "type": "categorical",
+          "non_missing_count": 42,
+          "missing_count": 0,
+          "category_proportions": {
+            "Friday": 0.19047619047619047,
+            "Monday": 0.14285714285714285,
+            "Saturday": 0.09523809523809523,
+            "Sunday": 0.2857142857142857,
+            "Thursday": 0.07142857142857142,
+            "Tuesday": 0.07142857142857142,
+            "Wednesday": 0.14285714285714285
+          }
+        },
+        "appointment_type": {
+          "type": "categorical",
+          "non_missing_count": 42,
+          "missing_count": 0,
+          "category_proportions": {
+            "consultation": 0.19047619047619047,
+            "follow_up": 0.07142857142857142,
+            "procedure": 0.14285714285714285,
+            "routine": 0.5952380952380952
+          }
+        }
+      }
+    }
+  },
+  "correct_predictions": {
+    "count": 188,
+    "feature_patterns": {
+      "record_count": 188,
+      "features": {
+        "days_ahead": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 175,
+          "missing_count": 13,
+          "mean": 25.36,
+          "median": 24.0
+        },
+        "previous_appointments": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 188,
+          "missing_count": 0,
+          "mean": 2.8297872340425534,
+          "median": 3.0
+        },
+        "previous_no_shows": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 188,
+          "missing_count": 0,
+          "mean": 0.526595744680851,
+          "median": 0.0
+        },
+        "appointment_hour": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 182,
+          "missing_count": 6,
+          "mean": 12.978021978021978,
+          "median": 13.0
+        },
+        "distance_km": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 180,
+          "missing_count": 8,
+          "mean": 10.990833333333333,
+          "median": 9.055
+        },
+        "portal_activity": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 180,
+          "missing_count": 8,
+          "mean": 2.1444444444444444,
+          "median": 2.0
+        },
+        "engagement_score": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 175,
+          "missing_count": 13,
+          "mean": 68.36114285714285,
+          "median": 68.26
+        },
+        "sms_reminder": {
+          "type": "numeric_or_binary",
+          "non_missing_count": 185,
+          "missing_count": 3,
+          "mean": 0.7081081081081081,
+          "median": 1.0
+        },
+        "weekday": {
+          "type": "categorical",
+          "non_missing_count": 187,
+          "missing_count": 1,
+          "category_proportions": {
+            "Friday": 0.11764705882352941,
+            "Monday": 0.12834224598930483,
+            "Saturday": 0.10695187165775401,
+            "Sunday": 0.20320855614973263,
+            "Thursday": 0.13903743315508021,
+            "Tuesday": 0.1497326203208556,
+            "Wednesday": 0.15508021390374332
+          }
+        },
+        "appointment_type": {
+          "type": "categorical",
+          "non_missing_count": 185,
+          "missing_count": 3,
+          "category_proportions": {
+            "consultation": 0.1891891891891892,
+            "follow_up": 0.34054054054054056,
+            "procedure": 0.08108108108108109,
+            "routine": 0.3891891891891892
+          }
+        }
+      }
+    }
+  },
+  "interpretation_note": "Feature patterns are aggregate descriptive summaries only. They do not explain causation, diagnose individuals, or justify test-set model, feature, or threshold changes."
+}

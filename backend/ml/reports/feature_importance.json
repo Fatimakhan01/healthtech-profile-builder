@@ -1,0 +1,63 @@
+{
+  "model": "saved LogisticRegression pipeline",
+  "split": "validation",
+  "split_size": 300,
+  "scoring": "f1",
+  "baseline_f1": 0.4928909952606635,
+  "n_repeats": 30,
+  "random_state": 42,
+  "importance_definition": "Mean decrease in validation F1 when one original input feature is permuted; larger positive values indicate greater reliance for this fitted model on this validation split.",
+  "features": [
+    {
+      "feature": "days_ahead",
+      "importance_mean": 0.09353867937028292,
+      "importance_std": 0.023052756873912082
+    },
+    {
+      "feature": "previous_no_shows",
+      "importance_mean": 0.055498991041460506,
+      "importance_std": 0.022599899343651888
+    },
+    {
+      "feature": "portal_activity",
+      "importance_mean": 0.03709401313000113,
+      "importance_std": 0.023039960251595736
+    },
+    {
+      "feature": "sms_reminder",
+      "importance_mean": 0.025725791822867165,
+      "importance_std": 0.012156525230517193
+    },
+    {
+      "feature": "distance_km",
+      "importance_mean": 0.019125551699073564,
+      "importance_std": 0.012937918070456297
+    },
+    {
+      "feature": "appointment_type",
+      "importance_mean": 0.007991859904895158,
+      "importance_std": 0.005388085861616531
+    },
+    {
+      "feature": "appointment_hour",
+      "importance_mean": 0.006639405511137664,
+      "importance_std": 0.009402042287733843
+    },
+    {
+      "feature": "engagement_score",
+      "importance_mean": 0.003955144665453172,
+      "importance_std": 0.004790046231554486
+    },
+    {
+      "feature": "weekday",
+      "importance_mean": 0.0031629090642154357,
+      "importance_std": 0.01687703965314576
+    },
+    {
+      "feature": "previous_appointments",
+      "importance_mean": -0.0011795078188617451,
+      "importance_std": 0.0020800134422862314
+    }
+  ],
+  "interpretation_note": "Permutation importance is split- and model-specific, not causal. Correlated inputs may share or mask importance."
+}
