@@ -1,6 +1,6 @@
 {
   "report_version": 1,
-  "generated_at": "2026-11-10T15:39:31.636573+00:00",
+  "generated_at": "2026-11-10T18:20:36.480689+00:00",
   "provider": "ollama",
   "model": "qwen2.5:1.5b-instruct",
   "dataset": {
@@ -194,7 +194,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "The confirmation should include the appointment date, time, and location.",
+          "generated_answer": "Check the confirmation for the appointment date, time, and location.",
           "insufficient_information": false,
           "citations": [
             {
@@ -268,7 +268,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "The person can contact the fictional scheduling desk or use the fictional online booking page to request a change to their appointment. The clinic will confirm whether the cancellation or new time has been recorded. A requested change should not be considered complete until confirmation is received.",
+          "generated_answer": "The person can contact the fictional scheduling desk to request a change to their appointment. If an online booking page was used, the fictional page may also provide a way to request a change. The fictional clinic will confirm whether the cancellation or new time has been recorded. A requested change should not be considered complete until confirmation is received.",
           "insufficient_information": false,
           "citations": [
             {
@@ -342,7 +342,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "Confirmation of the cancellation or new time should not be considered complete until the confirmation is received.",
+          "generated_answer": "Confirmation is required before a requested cancellation or new time is considered complete.",
           "insufficient_information": false,
           "citations": [
             {
@@ -416,7 +416,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "There is no cancellation deadline, fee, or real clinic procedure established in the provided policy passages.",
+          "generated_answer": "There is no cancellation deadline, fee, or real clinic procedure established in this fictional clinic policy.",
           "insufficient_information": false,
           "citations": [
             {
@@ -786,7 +786,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "The person may check the fictional online booking page or contact the fictional scheduling desk to confirm the appointment details.",
+          "generated_answer": "If an appointment reminder does not arrive, the person may check the fictional online booking page or contact the fictional scheduling desk to confirm the appointment details.",
           "insufficient_information": false,
           "citations": [
             {
@@ -860,7 +860,7 @@
             "id": "A",
             "name": "current"
           },
-          "generated_answer": "No, receiving a reminder does not replace checking the appointment confirmation. The information in the policy passages indicates that a reminder is a courtesy and does not replace the need to confirm the appointment details.",
+          "generated_answer": "No, receiving a reminder does not replace checking the appointment confirmation. The information provided in the policy passages indicates that a reminder is a courtesy and does not replace the need to confirm the appointment details.",
           "insufficient_information": false,
           "citations": [
             {
@@ -936,8 +936,8 @@
       },
       "summary": {
         "question_count": 12,
-        "passed": 4,
-        "failed": 8
+        "passed": 3,
+        "failed": 9
       },
       "results": [
         {
@@ -1064,9 +1064,22 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": null,
-          "insufficient_information": null,
-          "citations": [],
+          "generated_answer": "The person should check the confirmation for the appointment date, time, and location.",
+          "insufficient_information": false,
+          "citations": [
+            {
+              "title": "Synthetic Example — Appointment Scheduling",
+              "filename": "appointment-scheduling.md"
+            },
+            {
+              "title": "Synthetic Example — Appointment Reminders",
+              "filename": "reminders.md"
+            },
+            {
+              "title": "Synthetic Example — Cancellations and Rescheduling",
+              "filename": "cancellations.md"
+            }
+          ],
           "retrieval_results": [
             {
               "chunk_id": 1,
@@ -1092,14 +1105,15 @@
           ],
           "evaluation_outcome": {
             "citation_correctness": false,
-            "relevance_to_retrieved_passages": false,
+            "relevance_to_retrieved_passages": true,
             "unsupported_claims": {
-              "passed": false,
-              "found": []
+              "passed": true,
+              "found": [],
+              "method": "Curated forbidden-phrase checks; not semantic fact verification."
             },
-            "correct_abstention": false,
+            "correct_abstention": true,
             "passed": false,
-            "error": "FAQMalformedResponse"
+            "error": null
           }
         },
         {
@@ -1113,7 +1127,7 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": "A person can ask to change an appointment by contacting the fictional scheduling desk or using the fictional online booking page. The fictional clinic will confirm whether the cancellation or new time has been recorded. A requested change should not be considered complete until confirmation is received.",
+          "generated_answer": "The person can contact the fictional scheduling desk or use the fictional online booking page to request a change to their appointment. The fictional clinic will confirm whether the cancellation or new time has been recorded. A requested change should not be considered complete until confirmation is received.",
           "insufficient_information": false,
           "citations": [
             {
@@ -1239,7 +1253,7 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": "No cancellation deadline is established in this fictional clinic policy.",
+          "generated_answer": "There is no cancellation deadline, fee, or real clinic procedure established in the provided policy passages.",
           "insufficient_information": true,
           "citations": [],
           "retrieval_results": [
@@ -1332,7 +1346,7 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": "Contact the fictional scheduling desk as soon as practical to explain the situation and inquire about the possibility of accommodating the appointment or rescheduling it.",
+          "generated_answer": "Contact the fictional scheduling desk as soon as practical to explain the situation and inquire about whether the appointment can still be accommodated or needs to be rescheduled.",
           "insufficient_information": true,
           "citations": [],
           "retrieval_results": [
@@ -1418,9 +1432,22 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": "The appointment reminders are sent using the contact method selected for the booking, and there is no specific time mentioned for when they are sent.",
-          "insufficient_information": true,
-          "citations": [],
+          "generated_answer": "The appointment reminders are sent using the contact method selected for the booking, such as email or phone. If a reminder is not received, the person can check the online booking page or contact the scheduling desk to confirm the appointment details.",
+          "insufficient_information": false,
+          "citations": [
+            {
+              "title": "Synthetic Example — Appointment Reminders",
+              "filename": "reminders.md"
+            },
+            {
+              "title": "Synthetic Example — Appointment Scheduling",
+              "filename": "appointment-scheduling.md"
+            },
+            {
+              "title": "Synthetic Example — Late Arrivals",
+              "filename": "late-arrivals.md"
+            }
+          ],
           "retrieval_results": [
             {
               "chunk_id": 4,
@@ -1445,15 +1472,15 @@
             }
           ],
           "evaluation_outcome": {
-            "citation_correctness": true,
+            "citation_correctness": false,
             "relevance_to_retrieved_passages": null,
             "unsupported_claims": {
               "passed": true,
               "found": [],
               "method": "Curated forbidden-phrase checks; not semantic fact verification."
             },
-            "correct_abstention": true,
-            "passed": true,
+            "correct_abstention": false,
+            "passed": false,
             "error": null
           }
         },
@@ -1518,7 +1545,7 @@
             "id": "B",
             "name": "improved"
           },
-          "generated_answer": "No, receiving a reminder does not replace checking the appointment confirmation. The information provided in the policy passages indicates that a reminder is a courtesy and does not replace the need to verify the appointment details through the confirmation.",
+          "generated_answer": "No, receiving a reminder does not replace checking the appointment confirmation. The information provided in the policy passages indicates that a reminder is a courtesy and does not replace the need to confirm the appointment details through the confirmation provided.",
           "insufficient_information": false,
           "citations": [
             {
