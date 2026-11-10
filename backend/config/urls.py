@@ -22,4 +22,6 @@ urlpatterns = [
     path("api/admin/", include("accounts.admin_urls")),
     path("api/profiles/", include("profiles.urls")),
     path("api/v1/predictions/", include("predictions.urls")),
+    path("api/v1/clinic-faq/", include("clinic_faq.urls")),
+    path("api/v1/ml-dashboard/", include("ml_dashboard.urls")),
 ]

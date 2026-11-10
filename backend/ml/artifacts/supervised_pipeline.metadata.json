@@ -1,0 +1,182 @@
+{
+  "metadata_schema_version": 1,
+  "model_name": "LogisticRegression",
+  "model_version": "week4-supervised-fbeb2aae94b06a9639befb86a901dcf693a82f2d059d63c1161eaf2637601500",
+  "artifact_sha256": "fbeb2aae94b06a9639befb86a901dcf693a82f2d059d63c1161eaf2637601500",
+  "dataset_description": "2,000 fictional synthetic appointment records; no real patient data.",
+  "dataset_sha256": "b0ace88abe1be19e7382c57250d26c959dc71a566d5360247651319249fb34b5",
+  "feature_schema": {
+    "days_ahead": {
+      "type": "numeric",
+      "meaning": "Whole days between booking and appointment, from 0 to 60."
+    },
+    "previous_appointments": {
+      "type": "numeric",
+      "meaning": "Fictional count of prior appointments, from 0 to 15."
+    },
+    "previous_no_shows": {
+      "type": "numeric",
+      "meaning": "Fictional count of prior missed appointments; never exceeds prior appointments."
+    },
+    "sms_reminder": {
+      "type": "binary",
+      "meaning": "Whether a reminder was scheduled at booking time (1=yes, 0=no)."
+    },
+    "weekday": {
+      "type": "categorical",
+      "meaning": "Scheduled day of week."
+    },
+    "appointment_hour": {
+      "type": "numeric",
+      "meaning": "Scheduled local hour, from 8 through 18."
+    },
+    "distance_km": {
+      "type": "numeric",
+      "meaning": "Fictional distance to appointment location in kilometers."
+    },
+    "appointment_type": {
+      "type": "categorical",
+      "meaning": "Fictional booking category: routine, follow_up, consultation, or procedure."
+    },
+    "portal_activity": {
+      "type": "numeric",
+      "meaning": "Fictional count of portal actions before the appointment."
+    },
+    "engagement_score": {
+      "type": "numeric",
+      "meaning": "Fictional 0-100 engagement score available before the appointment."
+    }
+  },
+  "feature_names": [
+    "days_ahead",
+    "previous_appointments",
+    "previous_no_shows",
+    "appointment_hour",
+    "distance_km",
+    "portal_activity",
+    "engagement_score",
+    "sms_reminder",
+    "weekday",
+    "appointment_type"
+  ],
+  "target_name": "no_show",
+  "random_seed": 42,
+  "split_strategy": "Stratified 70% train, 15% validation, 15% test",
+  "split_sizes": {
+    "train": 1400,
+    "validation": 300,
+    "test": 300
+  },
+  "training_configuration": {
+    "candidate_models": [
+      "LogisticRegression",
+      "RandomForestClassifier",
+      "GradientBoostingClassifier",
+      "TunedRandomForestClassifier"
+    ],
+    "model_parameters": {
+      "LogisticRegression": {
+        "C": 1.0,
+        "class_weight": "balanced",
+        "dual": false,
+        "fit_intercept": true,
+        "intercept_scaling": 1,
+        "l1_ratio": null,
+        "max_iter": 1000,
+        "multi_class": "deprecated",
+        "n_jobs": null,
+        "penalty": "l2",
+        "random_state": 42,
+        "solver": "lbfgs",
+        "tol": 0.0001,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "RandomForestClassifier": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": "balanced_subsample",
+        "criterion": "gini",
+        "max_depth": null,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 1,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 100,
+        "n_jobs": 1,
+        "oob_score": false,
+        "random_state": 42,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "GradientBoostingClassifier": {
+        "ccp_alpha": 0.0,
+        "criterion": "friedman_mse",
+        "init": null,
+        "learning_rate": 0.1,
+        "loss": "log_loss",
+        "max_depth": 3,
+        "max_features": null,
+        "max_leaf_nodes": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 1,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "n_estimators": 100,
+        "n_iter_no_change": null,
+        "random_state": 42,
+        "subsample": 1.0,
+        "tol": 0.0001,
+        "validation_fraction": 0.1,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "TunedRandomForestClassifier": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": "balanced_subsample",
+        "criterion": "gini",
+        "max_depth": 10,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 3,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 200,
+        "n_jobs": 1,
+        "oob_score": false,
+        "random_state": 42,
+        "verbose": 0,
+        "warm_start": false
+      }
+    },
+    "cross_validation": {
+      "type": "StratifiedKFold",
+      "n_splits": 5,
+      "shuffle": true,
+      "random_state": 42,
+      "training_data_only": true
+    },
+    "grid_search": {
+      "model": "RandomForestClassifier",
+      "scoring": "f1",
+      "best_params": {
+        "model__max_depth": 10,
+        "model__min_samples_leaf": 3,
+        "model__n_estimators": 200
+      },
+      "best_cv_f1_mean": 0.4080174685718352
+    },
+    "selected_model": "LogisticRegression"
+  },
+  "python_version": "3.13.17",
+  "scikit_learn_version": "1.5.2",
+  "positive_class": 1
+}

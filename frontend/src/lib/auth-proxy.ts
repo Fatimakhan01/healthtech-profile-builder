@@ -11,7 +11,9 @@ type AuthEndpoint =
   | "admin-session"
   | "admin-profiles"
   | "admin-profile-status"
-  | "no-show-prediction";
+  | "no-show-prediction"
+  | "clinic-faq"
+  | "ml-dashboard";
 
 const SESSION_COOKIE_NAMES = new Set(["sessionid", "csrftoken"]);
 
@@ -42,6 +44,8 @@ export async function proxyAuthRequest(
     endpoint === "me" ||
     endpoint === "profile" ||
     endpoint === "no-show-prediction" ||
+    endpoint === "clinic-faq" ||
+    endpoint === "ml-dashboard" ||
     endpoint === "session-refresh" ||
     endpoint === "session-logout"
   ) {
@@ -61,6 +65,8 @@ export async function proxyAuthRequest(
     "admin-profiles",
     "admin-profile-status",
     "no-show-prediction",
+    "clinic-faq",
+    "ml-dashboard",
   ];
   const cookies = sessionEndpoints.includes(endpoint)
     ? getForwardedCookies(request.headers.get("cookie"))
@@ -98,6 +104,8 @@ export async function proxyAuthRequest(
       "admin-profiles": "/admin/profiles/",
       "admin-profile-status": "/admin/profiles/",
       "no-show-prediction": "/v1/predictions/no-show/",
+      "clinic-faq": "/v1/clinic-faq/ask/",
+      "ml-dashboard": "/v1/ml-dashboard/",
     };
     const upstreamPath =
       endpoint === "admin-profile-status"
@@ -143,7 +151,11 @@ export async function proxyAuthRequest(
         detail:
           endpoint === "no-show-prediction"
             ? "The prediction service is unavailable."
-            : "The authentication service is unavailable.",
+            : endpoint === "clinic-faq"
+              ? "The FAQ assistant is unavailable."
+              : endpoint === "ml-dashboard"
+                ? "The ML dashboard is unavailable."
+              : "The authentication service is unavailable.",
       },
       { status: 502, headers: { "cache-control": "no-store" } },
     );

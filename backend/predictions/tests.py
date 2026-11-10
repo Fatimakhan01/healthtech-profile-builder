@@ -373,6 +373,41 @@ class ModelArtifactValidationTests(SimpleTestCase):
         self.write_bundle(write_metadata=False)
         self.assert_safe_unavailable(self.post_prediction())
 
+    def test_missing_model_hash_fails_before_deserialization(self):
+        self.write_bundle()
+        del os.environ[views.ARTIFACT_DIGEST_ENV]
+        views.load_pipeline.cache_clear()
+
+        with patch("joblib.load") as deserialize:
+            response = self.post_prediction()
+
+        self.assert_safe_unavailable(response)
+        deserialize.assert_not_called()
+
+    def test_missing_metadata_hash_fails_before_deserialization(self):
+        self.write_bundle()
+        del os.environ[views.METADATA_DIGEST_ENV]
+        views.load_pipeline.cache_clear()
+
+        with patch("joblib.load") as deserialize:
+            response = self.post_prediction()
+
+        self.assert_safe_unavailable(response)
+        deserialize.assert_not_called()
+
+    def test_invalid_hash_format_fails_before_deserialization(self):
+        for variable in (views.ARTIFACT_DIGEST_ENV, views.METADATA_DIGEST_ENV):
+            with self.subTest(variable=variable):
+                self.write_bundle()
+                os.environ[variable] = "not-a-sha256"
+                views.load_pipeline.cache_clear()
+
+                with patch("joblib.load") as deserialize:
+                    response = self.post_prediction()
+
+                self.assert_safe_unavailable(response)
+                deserialize.assert_not_called()
+
     def test_malformed_metadata_returns_safe_server_error(self):
         joblib.dump(FakePipeline(), self.artifact_path)
         artifact_digest = hashlib.sha256(self.artifact_path.read_bytes()).hexdigest()
@@ -407,6 +442,15 @@ class ModelArtifactValidationTests(SimpleTestCase):
 
         self.assert_safe_unavailable(response)
         deserialize.assert_not_called()
+
+    def test_correct_hashes_load_verified_pipeline(self):
+        self.write_bundle()
+
+        model, metadata = views.load_pipeline()
+
+        self.assertIsInstance(model, FakePipeline)
+        self.assertEqual(metadata["artifact_sha256"], os.environ[views.ARTIFACT_DIGEST_ENV])
+        self.assertEqual(metadata["positive_class"], 1)
 
     def test_model_version_must_match_verified_artifact_digest(self):
         artifact_digest = self.write_bundle()
