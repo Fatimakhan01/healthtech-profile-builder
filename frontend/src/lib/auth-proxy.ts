@@ -11,6 +11,7 @@ type AuthEndpoint =
   | "admin-session"
   | "admin-profiles"
   | "admin-profile-status"
+  | "admin-workflow-jobs"
   | "no-show-prediction"
   | "clinic-faq"
   | "ml-dashboard";
@@ -64,6 +65,7 @@ export async function proxyAuthRequest(
     "admin-session",
     "admin-profiles",
     "admin-profile-status",
+    "admin-workflow-jobs",
     "no-show-prediction",
     "clinic-faq",
     "ml-dashboard",
@@ -103,6 +105,7 @@ export async function proxyAuthRequest(
       "admin-session": "/admin/session/",
       "admin-profiles": "/admin/profiles/",
       "admin-profile-status": "/admin/profiles/",
+      "admin-workflow-jobs": "/admin/workflows/jobs/",
       "no-show-prediction": "/v1/predictions/no-show/",
       "clinic-faq": "/v1/clinic-faq/ask/",
       "ml-dashboard": "/v1/ml-dashboard/",
@@ -118,8 +121,12 @@ export async function proxyAuthRequest(
       );
     }
     const upstreamUrl = new URL(`${backendUrl}${upstreamPath}`);
-    if (endpoint === "admin-profiles") {
-      for (const parameter of ["search", "active", "page", "page_size"]) {
+    if (endpoint === "admin-profiles" || endpoint === "admin-workflow-jobs") {
+      const parameters =
+        endpoint === "admin-profiles"
+          ? ["search", "active", "page", "page_size"]
+          : ["page", "page_size"];
+      for (const parameter of parameters) {
         const value = new URL(request.url).searchParams.get(parameter);
         if (value !== null) {
           upstreamUrl.searchParams.set(parameter, value);

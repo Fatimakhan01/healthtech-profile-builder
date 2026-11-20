@@ -53,6 +53,10 @@ NO_EVIDENCE_ANSWER = (
     "I don't have enough information in the approved clinic policies to "
     "answer that question."
 )
+CORRECTIVE_FORMAT_INSTRUCTION = (
+    "Formatting correction: return exactly one JSON object matching the "
+    "supplied schema. Do not include Markdown fences or surrounding prose."
+)
 
 
 class FAQConfigurationError(Exception):
@@ -67,8 +71,58 @@ class FAQProviderError(Exception):
     """The local Ollama service failed."""
 
 
+FAQ_MALFORMED_RESPONSE_CODES = frozenset(
+    {
+        "invalid_encoding",
+        "invalid_json",
+        "invalid_envelope",
+        "missing_message",
+        "invalid_message",
+        "missing_content",
+        "non_text_content",
+        "invalid_response_shape",
+        "missing_required_field",
+        "unexpected_field",
+        "invalid_answer_type",
+        "empty_answer",
+        "invalid_boolean_type",
+    }
+)
+
+
 class FAQMalformedResponse(Exception):
     """Ollama response did not match the expected JSON contract."""
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        code: str = "invalid_response_shape",
+        json_error_position: int | None = None,
+        content_length: int | None = None,
+    ):
+        if not isinstance(code, str) or code not in FAQ_MALFORMED_RESPONSE_CODES:
+            raise ValueError("Unsupported malformed-response code.")
+        if (
+            json_error_position is not None
+            and (type(json_error_position) is not int or json_error_position < 0)
+        ):
+            raise ValueError("json_error_position must be a non-negative integer.")
+        if (
+            content_length is not None
+            and (type(content_length) is not int or content_length < 0)
+        ):
+            raise ValueError("content_length must be a non-negative integer.")
+        if (json_error_position is not None or content_length is not None) and (
+            code != "invalid_json"
+        ):
+            raise ValueError("JSON diagnostic metadata requires invalid_json code.")
+        if content_length is not None and json_error_position is None:
+            raise ValueError("content_length requires json_error_position.")
+        super().__init__(message)
+        self.code = code
+        self.json_error_position = json_error_position
+        self.content_length = content_length
 
 
 @dataclass(frozen=True)
@@ -177,25 +231,115 @@ def load_provider_config(environ: dict[str, str] | None = None) -> ProviderConfi
     )
 
 
-def _parse_answer(content: Any) -> dict[str, Any]:
-    if not isinstance(content, str):
-        raise FAQMalformedResponse("Ollama response content is not text.")
-    try:
-        payload = json.loads(content)
-    except json.JSONDecodeError as error:
-        raise FAQMalformedResponse("Ollama response is not valid JSON.") from error
-    if (
-        not isinstance(payload, dict)
-        or set(payload) != {"answer", "insufficient_information"}
-        or not isinstance(payload["answer"], str)
-        or not payload["answer"].strip()
-        or type(payload["insufficient_information"]) is not bool
-    ):
-        raise FAQMalformedResponse("Ollama response has an invalid shape.")
+def _surrounding_text_is_safe(content: str, start: int, end: int) -> bool:
+    prefix = content[:start]
+    suffix = content[end:]
+    if any(character in "{}" for character in prefix + suffix):
+        return False
+
+    fence_count = content.count("```")
+    if not fence_count:
+        return True
+    if fence_count != 2:
+        return False
+
+    opening_fence = content.find("```")
+    closing_fence = content.find("```", opening_fence + 3)
+    if opening_fence >= start or closing_fence < end:
+        return False
+    language = content[opening_fence + 3 : start].strip()
+    return (
+        language.lower() in {"", "json"}
+        and not content[end:closing_fence].strip()
+    )
+
+
+def _extract_complete_json_object(
+    content: str,
+    initial_error: json.JSONDecodeError,
+) -> tuple[dict[str, Any] | None, int]:
+    decoder = json.JSONDecoder()
+    best_error_position = initial_error.pos
+    search_from = 0
+    while True:
+        start = content.find("{", search_from)
+        if start < 0:
+            return None, best_error_position
+        try:
+            payload, end = decoder.raw_decode(content, start)
+        except json.JSONDecodeError as error:
+            best_error_position = max(best_error_position, start + error.pos)
+            search_from = start + 1
+            continue
+        if (
+            isinstance(payload, dict)
+            and _surrounding_text_is_safe(content, start, end)
+        ):
+            return payload, best_error_position
+        search_from = start + 1
+
+
+def _validate_answer_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise FAQMalformedResponse(
+            "Ollama response must be a JSON object.",
+            code="invalid_response_shape",
+        )
+    required_fields = {"answer", "insufficient_information"}
+    if required_fields - set(payload):
+        raise FAQMalformedResponse(
+            "Ollama response is missing a required field.",
+            code="missing_required_field",
+        )
+    if set(payload) - required_fields:
+        raise FAQMalformedResponse(
+            "Ollama response contains an unexpected field.",
+            code="unexpected_field",
+        )
+    if not isinstance(payload["answer"], str):
+        raise FAQMalformedResponse(
+            "Ollama response answer must be text.",
+            code="invalid_answer_type",
+        )
+    if not payload["answer"].strip():
+        raise FAQMalformedResponse(
+            "Ollama response answer must not be empty.",
+            code="empty_answer",
+        )
+    if type(payload["insufficient_information"]) is not bool:
+        raise FAQMalformedResponse(
+            "Ollama response insufficient_information must be boolean.",
+            code="invalid_boolean_type",
+        )
     return {
         "answer": payload["answer"].strip(),
         "insufficient_information": payload["insufficient_information"],
     }
+
+
+def _parse_answer(content: Any) -> dict[str, Any]:
+    if not isinstance(content, str):
+        raise FAQMalformedResponse(
+            "Ollama response content is not text.",
+            code="non_text_content",
+        )
+    normalized = content.strip().lstrip("\ufeff").strip()
+    content_offset = content.find(normalized) if normalized else len(content)
+    try:
+        payload = json.loads(normalized)
+    except json.JSONDecodeError as error:
+        payload, extraction_error_position = _extract_complete_json_object(
+            normalized,
+            error,
+        )
+        if payload is None:
+            raise FAQMalformedResponse(
+                "Ollama response is not valid JSON.",
+                code="invalid_json",
+                json_error_position=content_offset + extraction_error_position,
+                content_length=len(content),
+            ) from error
+    return _validate_answer_payload(payload)
 
 
 def _citations(passages: list[RetrievedPolicyChunk]) -> list[dict[str, str]]:
@@ -236,7 +380,8 @@ def _request_ollama(
     passages: list[RetrievedPolicyChunk],
     system_prompt: str = SYSTEM_PROMPT,
 ):
-    body = json.dumps(
+    return _send_ollama_request(
+        config,
         {
             "model": config.chat_model,
             "messages": [
@@ -250,8 +395,12 @@ def _request_ollama(
                 "temperature": config.temperature,
                 "num_predict": config.max_output_tokens,
             },
-        }
-    ).encode("utf-8")
+        },
+    )
+
+
+def _send_ollama_request(config: ProviderConfig, payload: dict[str, Any]):
+    body = json.dumps(payload).encode("utf-8")
     request = Request(
         f"{config.base_url}/api/chat",
         data=body,
@@ -261,11 +410,26 @@ def _request_ollama(
     try:
         with urlopen(request, timeout=config.timeout_seconds) as response:
             try:
-                return json.loads(response.read().decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                body = response.read().decode("utf-8")
+            except UnicodeDecodeError as error:
                 raise FAQMalformedResponse(
-                    "Ollama response is not valid JSON."
+                    "Ollama response is not valid UTF-8.",
+                    code="invalid_encoding",
                 ) from error
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError as error:
+                raise FAQMalformedResponse(
+                    "Ollama response is not valid JSON.",
+                    code="invalid_json",
+                    json_error_position=error.pos,
+                ) from error
+            if not isinstance(payload, dict):
+                raise FAQMalformedResponse(
+                    "Ollama response envelope must be a JSON object.",
+                    code="invalid_envelope",
+                )
+            return payload
     except HTTPError as error:
         if error.code == 404:
             raise FAQConfigurationError(
@@ -280,6 +444,80 @@ def _request_ollama(
         raise FAQProviderError from error
     except OSError as error:
         raise FAQProviderError from error
+
+
+def request_structured_output(
+    messages: list[dict[str, str]],
+    response_schema: dict[str, Any],
+    *,
+    config: ProviderConfig | None = None,
+) -> str:
+    """Request local Ollama JSON output using the provider's shared transport."""
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("messages must be a non-empty list.")
+    for message in messages:
+        if (
+            not isinstance(message, dict)
+            or set(message) != {"role", "content"}
+            or not isinstance(message["role"], str)
+            or message["role"] not in {"system", "user", "assistant"}
+            or not isinstance(message["content"], str)
+        ):
+            raise ValueError("messages must contain valid role/content entries.")
+    if (
+        not isinstance(response_schema, dict)
+        or response_schema.get("type") != "object"
+        or response_schema.get("additionalProperties") is not False
+    ):
+        raise ValueError("response_schema must be a strict JSON object schema.")
+
+    active_config = config or load_provider_config()
+    response = _send_ollama_request(
+        active_config,
+        {
+            "model": active_config.chat_model,
+            "messages": messages,
+            "stream": False,
+            "format": response_schema,
+            "options": {
+                "num_ctx": active_config.num_ctx,
+                "temperature": active_config.temperature,
+                "num_predict": active_config.max_output_tokens,
+            },
+        },
+    )
+    return _response_content(response)
+
+
+def _response_content(response: Any) -> str:
+    if not isinstance(response, dict):
+        raise FAQMalformedResponse(
+            "Ollama response envelope must be an object.",
+            code="invalid_envelope",
+        )
+    if "message" not in response:
+        raise FAQMalformedResponse(
+            "Ollama response is missing the message.",
+            code="missing_message",
+        )
+    message = response["message"]
+    if not isinstance(message, dict):
+        raise FAQMalformedResponse(
+            "Ollama response message must be an object.",
+            code="invalid_message",
+        )
+    if "content" not in message:
+        raise FAQMalformedResponse(
+            "Ollama response message is missing content.",
+            code="missing_content",
+        )
+    content = message["content"]
+    if not isinstance(content, str):
+        raise FAQMalformedResponse(
+            "Ollama response content is not text.",
+            code="non_text_content",
+        )
+    return content
 
 
 def answer_question(
@@ -344,12 +582,25 @@ def _answer_with_passages(
             "citations": [],
         }
 
-    response = _request_ollama(config, question, passages, system_prompt)
-    try:
-        content = response["message"]["content"]
-    except (KeyError, TypeError) as error:
-        raise FAQMalformedResponse("Ollama response is incomplete.") from error
-    answer = _parse_answer(content)
+    for attempt in range(2):
+        active_system_prompt = system_prompt
+        if attempt:
+            active_system_prompt = (
+                f"{system_prompt}\n\n{CORRECTIVE_FORMAT_INSTRUCTION}"
+            )
+        try:
+            response = _request_ollama(
+                config,
+                question,
+                passages,
+                active_system_prompt,
+            )
+            answer = _parse_answer(_response_content(response))
+            break
+        except FAQMalformedResponse:
+            if attempt:
+                raise
+
     answer["citations"] = (
         [] if answer["insufficient_information"] else _citations(passages)
     )

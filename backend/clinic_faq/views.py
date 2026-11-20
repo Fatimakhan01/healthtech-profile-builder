@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,6 +17,9 @@ from .provider import (
     answer_question,
 )
 from .serializers import FAQAnswerSerializer, FAQQuestionSerializer
+
+
+logger = logging.getLogger(__name__)
 
 
 class ClinicFAQView(APIView):
@@ -54,7 +59,40 @@ class ClinicFAQView(APIView):
                 status.HTTP_504_GATEWAY_TIMEOUT,
                 "The FAQ assistant timed out. Please try again.",
             )
-        except (FAQProviderError, FAQMalformedResponse):
+        except FAQProviderError as error:
+            logger.warning(
+                "Clinic FAQ request failed: stage=provider_error "
+                "exception_class=%s",
+                type(error).__name__,
+            )
+            return self._service_error(
+                status.HTTP_502_BAD_GATEWAY,
+                "The FAQ assistant could not provide a valid response.",
+            )
+        except FAQMalformedResponse as error:
+            if error.json_error_position is not None:
+                if error.content_length is not None:
+                    logger.warning(
+                        "Clinic FAQ request failed: stage=malformed_response "
+                        "category=%s json_error_position=%d "
+                        "extracted_content_length=%d",
+                        error.code,
+                        error.json_error_position,
+                        error.content_length,
+                    )
+                else:
+                    logger.warning(
+                        "Clinic FAQ request failed: stage=malformed_response "
+                        "category=%s json_error_position=%d",
+                        error.code,
+                        error.json_error_position,
+                    )
+            else:
+                logger.warning(
+                    "Clinic FAQ request failed: stage=malformed_response "
+                    "category=%s",
+                    error.code,
+                )
             return self._service_error(
                 status.HTTP_502_BAD_GATEWAY,
                 "The FAQ assistant could not provide a valid response.",
@@ -62,6 +100,10 @@ class ClinicFAQView(APIView):
 
         response_serializer = FAQAnswerSerializer(data=answer)
         if not response_serializer.is_valid():
+            logger.warning(
+                "Clinic FAQ request failed: stage=answer_validation "
+                "exception_code=serializer_validation_failed",
+            )
             return self._service_error(
                 status.HTTP_502_BAD_GATEWAY,
                 "The FAQ assistant could not provide a valid response.",

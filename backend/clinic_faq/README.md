@@ -82,12 +82,16 @@ FAQ answer generation are described below.
 ## Semantic retrieval
 
 `clinic_faq.retrieval.retrieve_policy_chunks(query, top_k=5,
-min_similarity=0.2)` performs read-only cosine-similarity search over current
-chunks from `policies/approved/`. It uses the configured local model to embed
-the query, and only considers chunks whose source still matches the approved
-file, chunk text hash, and configured embedding model. Malformed, stale, or
-dimension-incompatible vectors are ignored. Results contain the chunk ID,
-source title and filename, text, and similarity score.
+min_similarity=0.2)` performs read-only hybrid search over current chunks from
+`policies/approved/`. It combines local Sentence Transformers cosine ranking
+with PostgreSQL full-text ranking using reciprocal rank fusion. An explicit
+`search_mode="semantic"` retains semantic-only ranking, while
+`search_mode="keyword"` skips query embedding. Optional `filters` can narrow by
+existing `source_filenames` or `document_ids`; approved, active, indexed
+documents, current chunk versions, and valid stored embeddings remain
+mandatory in every mode. Results retain chunk ID, source title and filename,
+text, and semantic similarity, with additive fusion score and retrieval-method
+metadata.
 
 For manual verification after ingesting and embedding the approved policies,
 run from `backend/`:
@@ -95,6 +99,22 @@ run from `backend/`:
 ```powershell
 ..\.venv-integration\Scripts\python.exe manage.py shell -c "from clinic_faq.retrieval import retrieve_policy_chunks; [print({'chunk_id': r.chunk_id, 'source': r.source_filename, 'similarity': round(r.similarity, 4), 'text': r.text}) for r in retrieve_policy_chunks('How do I cancel an appointment?', top_k=3, min_similarity=0.2)]"
 ```
+
+The retrieval-only benchmark compares semantic and hybrid modes against the
+same labeled question set and measures source-based Recall@K, HitRate@K, MRR,
+and citation source precision/recall. Its three chunk-size trials use actual
+local embeddings and the production chunker on in-memory chunks; they do not
+change stored document/chunk records. Run it with the local embedding model
+already cached (the runner forces offline model loading):
+
+```powershell
+..\.venv-integration\Scripts\python.exe manage.py evaluate_clinic_retrieval
+```
+
+The command writes `clinic_faq/reports/retrieval_evaluation.json`,
+`retrieval_evaluation.md`, and `chunk_size_comparison.json`. It does not call
+Ollama. See `docs/testing/retrieval-evaluation.md` for metrics, configuration,
+and expected report structure.
 
 ## Local FAQ answer generation
 

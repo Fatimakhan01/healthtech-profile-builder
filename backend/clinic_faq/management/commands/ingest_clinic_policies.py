@@ -40,6 +40,7 @@ class Command(BaseCommand):
                 f"processed={summary.processed}, created={summary.created}, "
                 f"unchanged={summary.unchanged}, updated={summary.updated}, "
                 f"chunks_created={summary.chunks_created}, "
-                f"chunks_updated={summary.chunks_updated}."
+                f"chunks_updated={summary.chunks_updated}, "
+                f"deactivated={summary.deactivated}."
             )
         )

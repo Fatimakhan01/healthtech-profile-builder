@@ -89,6 +89,10 @@ class PolicyEmbeddingTests(TestCase):
                 for chunk in chunks
             )
         )
+        self.assertEqual(
+            PolicyDocument.objects.get().indexing_status,
+            PolicyDocument.IndexingStatus.INDEXED,
+        )
         self.assertTrue(
             all(
                 call.kwargs["batch_size"] <= 2
@@ -128,6 +132,10 @@ class PolicyEmbeddingTests(TestCase):
         self.assertTrue(old_ids.isdisjoint(changed_ids))
         self.assertTrue(
             all(chunk.embedding is None for chunk in PolicyChunk.objects.all())
+        )
+        self.assertEqual(
+            PolicyDocument.objects.get().indexing_status,
+            PolicyDocument.IndexingStatus.PENDING,
         )
 
         client = self.successful_client()

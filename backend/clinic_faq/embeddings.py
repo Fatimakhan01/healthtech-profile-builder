@@ -143,7 +143,11 @@ def _text_digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _approved_stored_chunks() -> tuple[list[PolicyChunk], int, int]:
+def _approved_stored_chunks(
+    *,
+    source_filenames: set[str] | None = None,
+    document_ids: set[int] | None = None,
+) -> tuple[list[PolicyChunk], int, int]:
     approved_directory = ingestion.APPROVED_POLICY_DIR
     if approved_directory.is_symlink() or not approved_directory.is_dir():
         raise ingestion.PolicyIngestionError(
@@ -161,7 +165,15 @@ def _approved_stored_chunks() -> tuple[list[PolicyChunk], int, int]:
     valid_chunks: list[PolicyChunk] = []
     skipped_documents = 0
     skipped_chunks = 0
-    documents = PolicyDocument.objects.prefetch_related("chunks").all()
+    documents = PolicyDocument.objects.filter(
+        is_approved=True,
+        is_active=True,
+    )
+    if source_filenames is not None:
+        documents = documents.filter(source_filename__in=source_filenames)
+    if document_ids is not None:
+        documents = documents.filter(pk__in=document_ids)
+    documents = documents.prefetch_related("chunks")
     for document in documents:
         source_path = approved_files.get(document.source_filename)
         if source_path is None:
@@ -189,7 +201,10 @@ def _approved_stored_chunks() -> tuple[list[PolicyChunk], int, int]:
         stored_chunks = list(document.chunks.all())
         expected_by_index = dict(enumerate(expected_chunks))
         for chunk in stored_chunks:
-            if expected_by_index.get(chunk.chunk_index) != chunk.text:
+            if (
+                chunk.document_version != document.version
+                or expected_by_index.get(chunk.chunk_index) != chunk.text
+            ):
                 skipped_chunks += 1
                 continue
             valid_chunks.append(chunk)
@@ -305,11 +320,18 @@ def embed_approved_chunks(
     skipped_chunks = invalid_chunks + eligible_chunks - len(matching_chunks)
     pending_chunks = matching_chunks
     if not pending_chunks:
+        _refresh_indexing_status({chunk.document_id for chunk in chunks}, model)
         return EmbeddingSummary(
             skipped_documents=skipped_documents,
             skipped_chunks=skipped_chunks,
         )
 
+    document_ids = {chunk.document_id for chunk in pending_chunks}
+    PolicyDocument.objects.filter(
+        pk__in=document_ids,
+        is_approved=True,
+        is_active=True,
+    ).update(indexing_status=PolicyDocument.IndexingStatus.PENDING)
     local_model = _load_model(model)
     embedded = 0
     batches = 0
@@ -341,8 +363,11 @@ def embed_approved_chunks(
                 )
                 if (
                     current.text != chunk.text
+                    or current.document_version != current.document.version
                     or current.document.content_sha256
                     != chunk.document.content_sha256
+                    or not current.document.is_active
+                    or not current.document.is_approved
                 ):
                     continue
                 current.embedding = vector
@@ -357,6 +382,7 @@ def embed_approved_chunks(
                 )
                 embedded += 1
 
+    _refresh_indexing_status(document_ids, model)
     return EmbeddingSummary(
         processed_documents=len({chunk.document_id for chunk in pending_chunks}),
         skipped_documents=skipped_documents,
@@ -366,3 +392,30 @@ def embed_approved_chunks(
         failed_chunks=0,
         batch_count=batches,
     )
+
+
+def _refresh_indexing_status(document_ids: set[int], model: str) -> None:
+    for document in PolicyDocument.objects.filter(
+        pk__in=document_ids,
+        is_approved=True,
+        is_active=True,
+    ).prefetch_related("chunks"):
+        chunks = list(document.chunks.all())
+        is_indexed = bool(chunks) and all(
+            chunk.document_version == document.version
+            and chunk.embedding_model == model
+            and chunk.embedding_text_sha256 == _text_digest(chunk.text)
+            and _valid_saved_embedding(
+                chunk.embedding,
+                MODEL_DIMENSIONS.get(model),
+            )
+            for chunk in chunks
+        )
+        status = (
+            PolicyDocument.IndexingStatus.INDEXED
+            if is_indexed
+            else PolicyDocument.IndexingStatus.PENDING
+        )
+        if document.indexing_status != status:
+            document.indexing_status = status
+            document.save(update_fields=["indexing_status"])

@@ -156,7 +156,17 @@ class PolicyIngestionPersistenceTests(TestCase):
         self.assertEqual(created_count, unchanged_count)
         self.assertEqual(document.source_filename, "test-policy.md")
         self.assertEqual(document.title, "Test Policy")
+        self.assertEqual(document.version, 1)
+        self.assertTrue(document.is_approved)
+        self.assertTrue(document.is_active)
+        self.assertEqual(
+            document.indexing_status,
+            PolicyDocument.IndexingStatus.PENDING,
+        )
         self.assertEqual(len(chunks), created_count)
+        self.assertTrue(
+            all(chunk.document_version == document.version for chunk in chunks)
+        )
         self.assertEqual(
             [chunk.chunk_index for chunk in chunks],
             list(range(created_count)),
@@ -184,6 +194,12 @@ class PolicyIngestionPersistenceTests(TestCase):
         self.assertEqual(state, "created")
         self.assertEqual(updated_state, "updated")
         self.assertNotEqual(document.content_sha256, original_digest)
+        self.assertEqual(document.version, 2)
+        self.assertEqual(document.version_history[0]["version"], 1)
+        self.assertEqual(
+            document.version_history[0]["content_sha256"],
+            original_digest,
+        )
         self.assertGreater(original_count, 1)
         self.assertEqual(PolicyDocument.objects.count(), 1)
         self.assertEqual(document.chunks.count(), updated_count)
@@ -213,10 +229,72 @@ class PolicyIngestionPersistenceTests(TestCase):
         self.assertEqual(updated_state, "updated")
         self.assertEqual(document.chunk_size, 40)
         self.assertEqual(document.chunk_overlap, 5)
+        self.assertEqual(document.version, 1)
         self.assertGreater(document.chunks.count(), original_count)
         self.assertEqual(
             document.chunks.count(),
             document.chunks.values("chunk_index").distinct().count(),
+        )
+
+    def test_removed_source_is_deactivated_and_chunks_are_removed(self):
+        path = self.write_policy("Retained historical source metadata.")
+        ingestion.ingest_document(path, chunk_size=80, overlap=10)
+        document = PolicyDocument.objects.get()
+        original_digest = document.content_sha256
+        path.unlink()
+
+        summary = ingestion.ingest_approved_documents(chunk_size=80, overlap=10)
+
+        document.refresh_from_db()
+        self.assertEqual(summary.deactivated, 1)
+        self.assertEqual(document.version, 1)
+        self.assertEqual(document.content_sha256, original_digest)
+        self.assertFalse(document.is_active)
+        self.assertEqual(
+            document.indexing_status,
+            PolicyDocument.IndexingStatus.INACTIVE,
+        )
+        self.assertFalse(document.chunks.exists())
+
+    def test_deactivated_source_can_be_reingested_without_false_version_change(self):
+        path = self.write_policy("Same source after reactivation.")
+        ingestion.ingest_document(path, chunk_size=80, overlap=10)
+        document = PolicyDocument.objects.get()
+        ingestion.deactivate_missing_documents(set())
+        self.assertFalse(document.chunks.exists())
+
+        state, count = ingestion.ingest_document(path, chunk_size=80, overlap=10)
+
+        document.refresh_from_db()
+        self.assertEqual(state, "updated")
+        self.assertEqual(document.version, 1)
+        self.assertTrue(document.is_active)
+        self.assertGreater(count, 0)
+        self.assertEqual(document.chunks.count(), count)
+
+    def test_failed_chunk_replacement_rolls_back_document_and_chunks(self):
+        path = self.write_policy("Original committed content. " * 8)
+        ingestion.ingest_document(path, chunk_size=60, overlap=10)
+        document = PolicyDocument.objects.get()
+        original_digest = document.content_sha256
+        original_version = document.version
+        original_chunk_ids = set(document.chunks.values_list("id", flat=True))
+        path.write_text("# Changed Policy\n\nReplacement content.", encoding="utf-8")
+
+        with patch.object(
+            PolicyChunk.objects,
+            "bulk_create",
+            side_effect=RuntimeError("simulated chunk storage failure"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "simulated"):
+                ingestion.ingest_document(path, chunk_size=60, overlap=10)
+
+        document.refresh_from_db()
+        self.assertEqual(document.content_sha256, original_digest)
+        self.assertEqual(document.version, original_version)
+        self.assertEqual(
+            set(document.chunks.values_list("id", flat=True)),
+            original_chunk_ids,
         )
 
     def test_command_reports_processed_unchanged_and_updated_counts(self):

@@ -30,6 +30,9 @@ class PolicyRetrievalTests(TestCase):
         self.source = self.approved_directory / "synthetic-policy.md"
         self.write_source("Fictional policy text. " * 20)
         ingestion.ingest_document(self.source, chunk_size=80, overlap=10)
+        document = PolicyDocument.objects.get()
+        document.indexing_status = PolicyDocument.IndexingStatus.INDEXED
+        document.save(update_fields=["indexing_status"])
         self.chunks = list(PolicyChunk.objects.order_by("chunk_index"))
 
     def write_source(self, text):
@@ -60,6 +63,20 @@ class PolicyRetrievalTests(TestCase):
     def retrieve(self, *args, **kwargs):
         with patch.dict(os.environ, self.environment, clear=True):
             return retrieve_policy_chunks(*args, **kwargs)
+
+    def add_policy(self, filename, text, similarity):
+        source = self.approved_directory / filename
+        source.write_text(f"# {filename[:-3]}\n\n{text}\n", encoding="utf-8")
+        ingestion.ingest_document(source, chunk_size=2_000, overlap=0)
+        document = PolicyDocument.objects.get(source_filename=filename)
+        document.indexing_status = PolicyDocument.IndexingStatus.INDEXED
+        document.save(update_fields=["indexing_status"])
+        chunk = document.chunks.get()
+        self.set_embedding(chunk, self.basis_vector(similarity))
+        return chunk
+
+    def reset_documents(self):
+        PolicyDocument.objects.all().delete()
 
     def test_ranks_by_cosine_similarity_and_returns_source_metadata(self):
         for chunk, score in zip(self.chunks[:3], (0.25, 0.95, 0.7)):
@@ -169,6 +186,223 @@ class PolicyRetrievalTests(TestCase):
         result_ids = {result.chunk_id for result in results}
         self.assertIn(approved_chunk.pk, result_ids)
         self.assertNotIn(outside_chunk.pk, result_ids)
+
+    def test_stale_document_version_chunks_are_not_retrieved(self):
+        chunk = self.chunks[0]
+        self.set_embedding(chunk, self.basis_vector(1.0))
+        chunk.document_version = chunk.document.version - 1
+        chunk.save(update_fields=["document_version"])
+
+        with patch("clinic_faq.embeddings.embed_query") as embed_query:
+            results = self.retrieve("Policy question")
+
+        self.assertEqual(results, [])
+        embed_query.assert_not_called()
+
+    def test_inactive_or_unapproved_documents_are_not_retrieved(self):
+        chunk = self.chunks[0]
+        self.set_embedding(chunk, self.basis_vector(1.0))
+        document = chunk.document
+        document.is_active = False
+        document.save(update_fields=["is_active"])
+
+        with patch("clinic_faq.embeddings.embed_query") as embed_query:
+            self.assertEqual(self.retrieve("Policy question"), [])
+        embed_query.assert_not_called()
+
+    def test_hybrid_returns_keyword_only_match_below_semantic_threshold(self):
+        self.reset_documents()
+        keyword_match = self.add_policy(
+            "keyword.md",
+            "Appointment booking requires advance notice.",
+            0.0,
+        )
+        self.add_policy("unrelated.md", "Local transport information.", 0.1)
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            results = self.retrieve(
+                "appointment booking",
+                min_similarity=0.2,
+            )
+
+        self.assertEqual([result.chunk_id for result in results], [keyword_match.pk])
+        self.assertEqual(results[0].similarity, 0.0)
+        self.assertEqual(results[0].retrieval_method, "keyword")
+        self.assertGreater(results[0].fusion_score, 0)
+
+    def test_hybrid_returns_semantic_only_match(self):
+        self.reset_documents()
+        semantic_match = self.add_policy(
+            "semantic.md",
+            "Transport and accessibility arrangements.",
+            0.9,
+        )
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            results = self.retrieve("appointment cancellation")
+
+        self.assertEqual([result.chunk_id for result in results], [semantic_match.pk])
+        self.assertAlmostEqual(results[0].similarity, 0.9)
+        self.assertEqual(results[0].retrieval_method, "semantic")
+
+    def test_rrf_combines_rankings_deduplicates_and_reranks_deterministically(self):
+        self.reset_documents()
+        exact_match = self.add_policy(
+            "exact.md",
+            "Appointment booking information.",
+            0.8,
+        )
+        semantic_match = self.add_policy(
+            "semantic-first.md",
+            "Appointment details are available for booking through transport services.",
+            1.0,
+        )
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            first = self.retrieve("appointment booking", top_k=2)
+            second = self.retrieve("appointment booking", top_k=2)
+
+        self.assertEqual(
+            [result.chunk_id for result in first],
+            [exact_match.pk, semantic_match.pk],
+        )
+        self.assertEqual(
+            [result.chunk_id for result in second],
+            [result.chunk_id for result in first],
+        )
+        self.assertEqual(
+            [result.retrieval_method for result in first],
+            ["hybrid", "hybrid"],
+        )
+        self.assertEqual(first[0].fusion_score, first[1].fusion_score)
+
+    def test_semantic_compatibility_mode_preserves_cosine_ranking(self):
+        self.reset_documents()
+        lower = self.add_policy("lower.md", "Different source text.", 0.7)
+        higher = self.add_policy("higher.md", "Other unrelated text.", 0.9)
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            results = self.retrieve(
+                "query without matching terms",
+                search_mode="semantic",
+            )
+
+        self.assertEqual(
+            [result.chunk_id for result in results],
+            [higher.pk, lower.pk],
+        )
+
+    def test_document_metadata_filters_only_narrow_eligible_sources(self):
+        self.reset_documents()
+        included = self.add_policy("included.md", "Appointment information.", 0.9)
+        self.add_policy("excluded.md", "Appointment information.", 0.9)
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            by_filename = self.retrieve(
+                "appointment",
+                filters={"source_filenames": ["included.md"]},
+            )
+            by_id = self.retrieve(
+                "appointment",
+                filters={"document_ids": [included.document_id]},
+            )
+
+        self.assertEqual([result.chunk_id for result in by_filename], [included.pk])
+        self.assertEqual([result.chunk_id for result in by_id], [included.pk])
+
+        included.document.indexing_status = PolicyDocument.IndexingStatus.PENDING
+        included.document.save(update_fields=["indexing_status"])
+        with patch("clinic_faq.embeddings.embed_query") as embed_query:
+            results = self.retrieve(
+                "appointment",
+                filters={
+                    "source_filenames": ["included.md"],
+                    "document_ids": [included.document_id],
+                },
+            )
+        self.assertEqual(results, [])
+        embed_query.assert_not_called()
+
+    def test_ineligible_metadata_versions_and_missing_embeddings_are_excluded(self):
+        self.reset_documents()
+        inactive = self.add_policy("inactive.md", "appointment information", 0.9)
+        unapproved = self.add_policy("unapproved.md", "appointment information", 0.9)
+        pending = self.add_policy("pending.md", "appointment information", 0.9)
+        stale = self.add_policy("stale.md", "appointment information", 0.9)
+        missing = self.add_policy("missing.md", "appointment information", 0.9)
+
+        inactive.document.is_active = False
+        inactive.document.save(update_fields=["is_active"])
+        unapproved.document.is_approved = False
+        unapproved.document.save(update_fields=["is_approved"])
+        pending.document.indexing_status = PolicyDocument.IndexingStatus.PENDING
+        pending.document.save(update_fields=["indexing_status"])
+        stale.document.version += 1
+        stale.document.save(update_fields=["version"])
+        missing.embedding = None
+        missing.save(update_fields=["embedding"])
+
+        with patch("clinic_faq.embeddings.embed_query") as embed_query:
+            results = self.retrieve("appointment")
+
+        self.assertEqual(results, [])
+        embed_query.assert_not_called()
+
+    def test_empty_keyword_results_and_invalid_filters_are_handled(self):
+        self.reset_documents()
+        self.add_policy("only.md", "No relevant terms in this policy.", 0.9)
+
+        with patch(
+            "clinic_faq.embeddings.embed_query",
+            return_value=self.basis_vector(1.0),
+        ):
+            results = self.retrieve(
+                "unmatched term",
+                search_mode="keyword",
+            )
+        self.assertEqual(results, [])
+
+        invalid_filters = (
+            [],
+            {"category": ["appointments"]},
+            {"source_filenames": "only.md"},
+            {"source_filenames": [" "]},
+            {"document_ids": [True]},
+            {"document_ids": []},
+            {"is_active": False},
+        )
+        for filters in invalid_filters:
+            with self.subTest(filters=filters):
+                with self.assertRaises(ValueError):
+                    self.retrieve("unmatched term", filters=filters)
+
+    def test_hybrid_limits_and_search_modes_are_validated(self):
+        for options in (
+            {"top_k": 0},
+            {"top_k": 51},
+            {"candidate_limit": 0},
+            {"candidate_limit": 10, "top_k": 11},
+            {"search_mode": "unsupported"},
+            {"search_mode": []},
+        ):
+            with self.subTest(options=options):
+                with self.assertRaises(ValueError):
+                    self.retrieve("Policy question", **options)
 
     def test_local_query_embedding_failure_is_safely_propagated(self):
         self.set_embedding(self.chunks[0], self.basis_vector(1.0))

@@ -3,6 +3,7 @@
 import hashlib
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from django.db import transaction
@@ -36,6 +37,7 @@ class IngestionSummary:
     updated: int = 0
     chunks_created: int = 0
     chunks_updated: int = 0
+    deactivated: int = 0
 
 
 def _approved_file(path: Path) -> Path:
@@ -172,32 +174,58 @@ def ingest_document(
     overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> tuple[str, int]:
     extracted = extract_document(source_path)
-    existing = PolicyDocument.objects.filter(
-        source_filename=extracted.source_filename
-    ).first()
+    _validate_chunk_parameters(chunk_size, overlap)
+    chunks = chunk_text(extracted.text, chunk_size=chunk_size, overlap=overlap)
+    existing = (
+        PolicyDocument.objects.select_for_update()
+        .filter(source_filename=extracted.source_filename)
+        .first()
+    )
     if (
         existing is not None
         and existing.content_sha256 == extracted.content_sha256
         and existing.chunk_size == chunk_size
         and existing.chunk_overlap == overlap
+        and existing.is_approved
+        and existing.is_active
     ):
         return "unchanged", existing.chunks.count()
 
-    document, created = PolicyDocument.objects.update_or_create(
-        source_filename=extracted.source_filename,
-        defaults={
-            "title": extracted.title,
-            "content_sha256": extracted.content_sha256,
-            "chunk_size": chunk_size,
-            "chunk_overlap": overlap,
-        },
-    )
+    created = existing is None
+    if created:
+        document = PolicyDocument(
+            source_filename=extracted.source_filename,
+            version=1,
+        )
+    else:
+        document = existing
+        if existing.content_sha256 != extracted.content_sha256:
+            history = list(existing.version_history)
+            history.append(
+                {
+                    "version": existing.version,
+                    "title": existing.title,
+                    "content_sha256": existing.content_sha256,
+                    "superseded_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            document.version_history = history
+            document.version += 1
+
+    document.title = extracted.title
+    document.content_sha256 = extracted.content_sha256
+    document.chunk_size = chunk_size
+    document.chunk_overlap = overlap
+    document.is_approved = True
+    document.is_active = True
+    document.indexing_status = PolicyDocument.IndexingStatus.PENDING
+    document.save()
     document.chunks.all().delete()
-    chunks = chunk_text(extracted.text, chunk_size=chunk_size, overlap=overlap)
     PolicyChunk.objects.bulk_create(
         [
             PolicyChunk(
                 document=document,
+                document_version=document.version,
                 chunk_index=index,
                 text=text,
             )
@@ -205,6 +233,21 @@ def ingest_document(
         ]
     )
     return ("created" if created else "updated"), len(chunks)
+
+
+@transaction.atomic
+def deactivate_missing_documents(source_filenames: set[str]) -> int:
+    documents = PolicyDocument.objects.select_for_update().filter(
+        is_active=True
+    ).exclude(source_filename__in=source_filenames)
+    deactivated = 0
+    for document in documents:
+        document.chunks.all().delete()
+        document.is_active = False
+        document.indexing_status = PolicyDocument.IndexingStatus.INACTIVE
+        document.save(update_fields=["is_active", "indexing_status", "ingested_at"])
+        deactivated += 1
+    return deactivated
 
 
 def ingest_approved_documents(
@@ -216,12 +259,17 @@ def ingest_approved_documents(
         raise PolicyIngestionError("Approved policy directory is missing.")
 
     paths = sorted(APPROVED_POLICY_DIR.iterdir(), key=lambda path: path.name.casefold())
-    outcomes = {"created": 0, "unchanged": 0, "updated": 0}
-    chunk_counts = {"created": 0, "updated": 0}
-    processed = 0
+    source_paths = []
     for path in paths:
         if path.is_dir() and not path.is_symlink():
             continue
+        _approved_file(path)
+        source_paths.append(path)
+
+    outcomes = {"created": 0, "unchanged": 0, "updated": 0}
+    chunk_counts = {"created": 0, "updated": 0}
+    processed = 0
+    for path in source_paths:
         outcome, count = ingest_document(path, chunk_size, overlap)
         outcomes[outcome] += 1
         if outcome == "created":
@@ -230,6 +278,9 @@ def ingest_approved_documents(
             chunk_counts["updated"] += count
         processed += 1
 
+    deactivated = deactivate_missing_documents(
+        {path.name for path in source_paths}
+    )
     return IngestionSummary(
         processed=processed,
         created=outcomes["created"],
@@ -237,4 +288,5 @@ def ingest_approved_documents(
         updated=outcomes["updated"],
         chunks_created=chunk_counts["created"],
         chunks_updated=chunk_counts["updated"],
+        deactivated=deactivated,
     )

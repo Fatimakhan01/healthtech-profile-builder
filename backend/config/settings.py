@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'profiles.apps.ProfilesConfig',
     'predictions.apps.PredictionsConfig',
     'clinic_faq.apps.ClinicFAQConfig',
+    'workflows.apps.WorkflowsConfig',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
