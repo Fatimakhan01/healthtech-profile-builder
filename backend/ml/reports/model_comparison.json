@@ -1,0 +1,321 @@
+{
+  "dataset": "backend/ml/data/appointment_attendance.csv",
+  "dataset_description": "2,000 fictional synthetic appointment records; no real patient data.",
+  "random_seed": 42,
+  "split_strategy": "Stratified 70% train, 15% validation, 15% test",
+  "split_sizes": {
+    "train": 1400,
+    "validation": 300,
+    "test": 300
+  },
+  "class_distribution": {
+    "overall": {
+      "0": {
+        "count": 1429,
+        "proportion": 0.7145
+      },
+      "1": {
+        "count": 571,
+        "proportion": 0.2855
+      }
+    },
+    "train": {
+      "0": {
+        "count": 1000,
+        "proportion": 0.7142857142857143
+      },
+      "1": {
+        "count": 400,
+        "proportion": 0.2857142857142857
+      }
+    },
+    "validation": {
+      "0": {
+        "count": 215,
+        "proportion": 0.7166666666666667
+      },
+      "1": {
+        "count": 85,
+        "proportion": 0.2833333333333333
+      }
+    },
+    "test": {
+      "0": {
+        "count": 214,
+        "proportion": 0.7133333333333334
+      },
+      "1": {
+        "count": 86,
+        "proportion": 0.2866666666666667
+      }
+    }
+  },
+  "feature_names": [
+    "days_ahead",
+    "previous_appointments",
+    "previous_no_shows",
+    "appointment_hour",
+    "distance_km",
+    "portal_activity",
+    "engagement_score",
+    "sms_reminder",
+    "weekday",
+    "appointment_type"
+  ],
+  "target_name": "no_show",
+  "training_metrics": {
+    "LogisticRegression": {
+      "parameters": {
+        "C": 1.0,
+        "class_weight": "balanced",
+        "dual": false,
+        "fit_intercept": true,
+        "intercept_scaling": 1,
+        "l1_ratio": null,
+        "max_iter": 1000,
+        "multi_class": "deprecated",
+        "n_jobs": null,
+        "penalty": "l2",
+        "random_state": 42,
+        "solver": "lbfgs",
+        "tol": 0.0001,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "training": {
+        "accuracy": 0.6314285714285715,
+        "precision": 0.40793650793650793,
+        "recall": 0.6425,
+        "f1_score": 0.49902912621359224,
+        "roc_auc": 0.6889075,
+        "average_precision": 0.4887034916747743,
+        "confusion_matrix": [
+          [
+            627,
+            373
+          ],
+          [
+            143,
+            257
+          ]
+        ]
+      },
+      "validation": {
+        "accuracy": 0.6433333333333333,
+        "precision": 0.4126984126984127,
+        "recall": 0.611764705882353,
+        "f1_score": 0.4928909952606635,
+        "roc_auc": 0.6667578659370724,
+        "average_precision": 0.5073105356411174,
+        "confusion_matrix": [
+          [
+            141,
+            74
+          ],
+          [
+            33,
+            52
+          ]
+        ]
+      }
+    },
+    "RandomForestClassifier": {
+      "parameters": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": "balanced_subsample",
+        "criterion": "gini",
+        "max_depth": null,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 1,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 100,
+        "n_jobs": 1,
+        "oob_score": false,
+        "random_state": 42,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "training": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "roc_auc": 1.0,
+        "average_precision": 1.0,
+        "confusion_matrix": [
+          [
+            1000,
+            0
+          ],
+          [
+            0,
+            400
+          ]
+        ]
+      },
+      "validation": {
+        "accuracy": 0.73,
+        "precision": 0.5909090909090909,
+        "recall": 0.15294117647058825,
+        "f1_score": 0.24299065420560748,
+        "roc_auc": 0.5836114911080711,
+        "average_precision": 0.3826669319421408,
+        "confusion_matrix": [
+          [
+            206,
+            9
+          ],
+          [
+            72,
+            13
+          ]
+        ]
+      }
+    },
+    "GradientBoostingClassifier": {
+      "parameters": {
+        "ccp_alpha": 0.0,
+        "criterion": "friedman_mse",
+        "init": null,
+        "learning_rate": 0.1,
+        "loss": "log_loss",
+        "max_depth": 3,
+        "max_features": null,
+        "max_leaf_nodes": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 1,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "n_estimators": 100,
+        "n_iter_no_change": null,
+        "random_state": 42,
+        "subsample": 1.0,
+        "tol": 0.0001,
+        "validation_fraction": 0.1,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "training": {
+        "accuracy": 0.8142857142857143,
+        "precision": 0.9022988505747126,
+        "recall": 0.3925,
+        "f1_score": 0.5470383275261324,
+        "roc_auc": 0.88615,
+        "average_precision": 0.7889011672630015,
+        "confusion_matrix": [
+          [
+            983,
+            17
+          ],
+          [
+            243,
+            157
+          ]
+        ]
+      },
+      "validation": {
+        "accuracy": 0.7233333333333334,
+        "precision": 0.5454545454545454,
+        "recall": 0.1411764705882353,
+        "f1_score": 0.22429906542056074,
+        "roc_auc": 0.6152667578659371,
+        "average_precision": 0.449737106244227,
+        "confusion_matrix": [
+          [
+            205,
+            10
+          ],
+          [
+            73,
+            12
+          ]
+        ]
+      }
+    },
+    "TunedRandomForestClassifier": {
+      "parameters": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": "balanced_subsample",
+        "criterion": "gini",
+        "max_depth": 10,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 3,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 200,
+        "n_jobs": 1,
+        "oob_score": false,
+        "random_state": 42,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "training": {
+        "accuracy": 0.9171428571428571,
+        "precision": 0.8446601941747572,
+        "recall": 0.87,
+        "f1_score": 0.8571428571428571,
+        "roc_auc": 0.9790325,
+        "average_precision": 0.9497431729828666,
+        "confusion_matrix": [
+          [
+            936,
+            64
+          ],
+          [
+            52,
+            348
+          ]
+        ]
+      },
+      "validation": {
+        "accuracy": 0.7066666666666667,
+        "precision": 0.47619047619047616,
+        "recall": 0.35294117647058826,
+        "f1_score": 0.40540540540540543,
+        "roc_auc": 0.6271956224350206,
+        "average_precision": 0.43792981043835116,
+        "confusion_matrix": [
+          [
+            182,
+            33
+          ],
+          [
+            55,
+            30
+          ]
+        ]
+      }
+    }
+  },
+  "selected_model": "LogisticRegression",
+  "selection_rule": "Highest validation binary F1; ties use training-only cross-validation mean F1 (GridSearchCV best mean F1 for the tuned forest).",
+  "test_metrics": {
+    "accuracy": 0.6266666666666667,
+    "precision": 0.38596491228070173,
+    "recall": 0.5116279069767442,
+    "f1_score": 0.44,
+    "roc_auc": 0.6498043903499239,
+    "average_precision": 0.3904348073356839,
+    "confusion_matrix": [
+      [
+        144,
+        70
+      ],
+      [
+        42,
+        44
+      ]
+    ]
+  }
+}

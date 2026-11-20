@@ -1,0 +1,1594 @@
+diff --git a/README.md b/README.md
+index ce1e6f7..5919554 100644
+--- a/README.md
++++ b/README.md
+@@ -130,21 +130,33 @@ Run the ML workflow from the repository root:
+ 
+ ```powershell
+ .\.venv-integration\Scripts\python.exe backend\ml\generate_data.py
+-.\.venv-integration\Scripts\python.exe backend\ml\eda.py
+ .\.venv-integration\Scripts\python.exe backend\ml\train.py
+ .\.venv-integration\Scripts\python.exe backend\ml\evaluate.py
+-.\.venv-integration\Scripts\python.exe backend\ml\diagnostics.py
+-.\.venv-integration\Scripts\python.exe backend\ml\regularization_experiment.py
+ ```
+ 
+ `generate_data.py` replaces the synthetic CSV; `train.py` replaces the saved
+-pipeline and `outputs/metrics.json`. Do not run those two commands if you need
+-to preserve the current data and recorded results. The evaluation and
+-diagnostic scripts and their output files are described in the [ML
+-documentation](./backend/ml/README.md).
++pipeline, its metadata sidecar, and `outputs/metrics.json`. Do not run those
++commands if you need to preserve the current data and recorded results.
++`evaluate.py` loads the saved pipeline, prints train/validation and final test
++diagnostics, and does not write output files. See the [ML documentation](./backend/ml/README.md)
++for EDA, cross-validation, learning-curve, and regularization commands.
+ 
+-To serve the no-show prediction endpoint, run Django with the integration
+-environment (it contains the ML packages as well as the backend packages):
++After training, configure trusted SHA-256 values for both files in the
++environment that runs Django. From the repository root, PowerShell can
++calculate the current digests:
++
++```powershell
++$env:NO_SHOW_MODEL_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.joblib -Algorithm SHA256).Hash.ToLowerInvariant()
++$env:NO_SHOW_MODEL_METADATA_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.metadata.json -Algorithm SHA256).Hash.ToLowerInvariant()
++```
++
++Provide these expected values through a trusted deployment configuration,
++independently of the replaceable files. Recalculate and update them after
++authorized retraining. The API verifies both values before loading the model.
++
++To serve the prediction endpoint, run Django with the integration environment
++(which includes ML and backend dependencies) in the same PowerShell session
++where the two digest variables are set:
+ 
+ ```powershell
+ Push-Location backend
+@@ -152,6 +164,72 @@ Push-Location backend
+ Pop-Location
+ ```
+ 
++### Week 3 prediction API and demo checklist
++
++The prototype uses 2,000 locally generated synthetic appointment records. It
++is educational, not clinical, and does not represent actual appointments.
++The versioned Django endpoint is `POST /api/v1/predictions/no-show/` and
++requires an active standard-user access JWT. Anonymous requests return 401;
++authenticated users with another role are denied. Invalid input returns 400.
++If the artifact or its trusted digest/metadata verification is unavailable,
++the API returns HTTP 503 with the generic body
++`{"detail":"The prediction model is temporarily unavailable."}`.
++
++Example request (replace the bearer placeholder with a valid standard-user
++access JWT):
++
++```http
++POST http://127.0.0.1:8000/api/v1/predictions/no-show/
++Authorization: Bearer <standard-user-access-jwt>
++Content-Type: application/json
++
++{
++  "days_ahead": 14,
++  "previous_no_shows": 1,
++  "sms_reminder": "yes",
++  "weekday": "Wednesday"
++}
++```
++
++Example response from the saved artifact at follow-up commit `1b7b489`:
++
++```json
++{
++  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
++  "display_version": "No-Show Model v1",
++  "predicted_class": 0,
++  "predicted_label": "attended",
++  "probability_no_show": 0.320676589796643,
++  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
++}
++```
++
++The model version is derived from the verified artifact SHA-256 and changes
++when the artifact changes. The example is illustrative; the API reference
++documents the current response contract.
++
++Demo checklist:
++
++- [ ] Signed-in standard user submits the example in the dashboard and sees a
++  result, model version, probability, and synthetic/non-clinical notice.
++- [ ] Send invalid JSON directly to Django (for example `days_ahead: 61`) and
++  confirm HTTP 400.
++- [ ] Send the valid request without a bearer token and confirm HTTP 401; send
++  it with an administrator token and confirm HTTP 403.
++- [ ] In a development-only Django process, configure a deliberately incorrect
++  trusted digest, restart the process, and confirm the dashboard displays the
++  generic unavailable response; restore the correct trusted values afterward.
++
++Automated API coverage is in `backend/predictions/tests.py`; run the focused
++command in the Verify section below. The automated authenticated test uses the
++saved model, and tests cover invalid input, anonymous access, wrong-role
++access, and unavailable artifacts. The checklist above is for manual
++demonstration; no manual UI run is claimed here.
++
++The mentor reviewed original Week 3 PR #2 at revision `1be90c1`; the Phase 1
++and Phase 2 follow-up implementation is at `1b7b489`. This README describes
++that reviewed follow-up state and is not evidence that a manual demo was run.
++
+ ## Technology and architecture
+ 
+ | Area | Implementation |
+@@ -281,34 +359,11 @@ See [docs/api-authentication.md](./docs/api-authentication.md) for full Django a
+ The prediction UI is available to signed-in standard users in the dashboard.
+ The browser posts to the same-origin Next.js route
+ `/api/predictions/no-show/`, which proxies to Django
+-`POST /api/v1/predictions/no-show/`. For example:
+-
+-```json
+-{
+-  "days_ahead": 14,
+-  "previous_no_shows": 1,
+-  "sms_reminder": "yes",
+-  "weekday": "Wednesday"
+-}
+-```
+-
+-The current saved pipeline returns an illustrative synthetic response for
+-those inputs:
+-
+-```json
+-{
+-  "model_version": "no-show-v1",
+-  "predicted_class": 0,
+-  "predicted_label": "attended",
+-  "probability_no_show": 0.320676589796643,
+-  "notice": "Experimental prediction from a fully synthetic educational dataset; not a clinical or real-world risk estimate."
+-}
+-```
+-
+-These are model outputs for fictional data, not predictions about a real
+-appointment. They are not clinically validated or suitable for healthcare or
+-appointment decisions. Input validation, authentication, and error responses
+-are documented in the [API reference](./docs/api-authentication.md).
++`POST /api/v1/predictions/no-show/`. It uses fictional synthetic records and
++is educational only, not a clinical tool or a real appointment-risk estimate.
++The [Week 3 API and demo checklist](#week-3-prediction-api-and-demo-checklist)
++contains the request/response example, authentication and failure behavior.
++See the [API reference](./docs/api-authentication.md) for the full contract.
+ 
+ ## Verify
+ 
+diff --git a/backend/ml/README.md b/backend/ml/README.md
+index 52d5487..3ac89b9 100644
+--- a/backend/ml/README.md
++++ b/backend/ml/README.md
+@@ -38,6 +38,16 @@ learnable demonstration; they do not represent established effects or
+ healthcare evidence. Feature distributions and target balance are also
+ synthetic.
+ 
++The 2,000 locally generated records contain 976 no-shows (48.8%), so this
++dataset is nearly balanced. That prevalence is a property of the generator,
++not an estimate of clinic prevalence. Real clinics may have substantially
++different no-show rates, and these metrics do not establish how a model would
++perform at those rates. The assumed logistic-style relationships among
++`days_ahead`, `previous_no_shows`, `sms_reminder`, `weekday`, and the target
++are educational assumptions, not findings from real patient data. Results
++must not be interpreted as clinical evidence or proof of real-world
++predictive performance.
++
+ ## Requirements and commands
+ 
+ The ML environment and prediction API tests use Python 3.13.17 in
+@@ -72,6 +82,26 @@ without writing files; `diagnostics.py` writes
+ and `train.py` replaces the model and metrics, so omit those commands when
+ preserving the existing artifacts.
+ 
++Training also writes `artifacts/no_show_pipeline.metadata.json`, recording
++the artifact-derived model version, SHA-256, feature order, positive class,
++Python version, and ML dependency versions. Before serving predictions, set
++`NO_SHOW_MODEL_SHA256` and `NO_SHOW_MODEL_METADATA_SHA256` in the Django
++process environment from a trusted deployment configuration. After an
++authorized retraining, update both values from the new files, for example in
++PowerShell from the repository root:
++
++```powershell
++$env:NO_SHOW_MODEL_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.joblib -Algorithm SHA256).Hash.ToLowerInvariant()
++$env:NO_SHOW_MODEL_METADATA_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.metadata.json -Algorithm SHA256).Hash.ToLowerInvariant()
++```
++
++Keep these expected digests outside the replaceable artifact and metadata
++files; deploy them through the trusted environment/configuration mechanism.
++The loader verifies both digests before deserializing the pipeline and rejects
++metadata with an incompatible feature schema, Python version, or dependency
++versions. Restart Django after updating the artifact or digest configuration
++so the in-process model cache is cleared.
++
+ ## Modeling and reproducibility
+ 
+ Seed `42` is used for data generation and the stratified train/validation/test
+@@ -81,28 +111,43 @@ scaling for numeric features; most-frequent imputation and one-hot encoding
+ for categorical features) is fitted only on the training data.
+ 
+ The training script compares a most-frequent `DummyClassifier` baseline with
+-logistic regression on validation F1-score. It selects the higher-F1 pipeline
+-(ties favor the baseline), evaluates that selected model once on the held-out
+-test set, and reports accuracy, precision, recall, F1-score, confusion matrix,
+-and ROC-AUC when both test classes are present. It also reports false-positive
+-and false-negative counts. Accuracy alone can be misleading if class
+-frequencies differ: a model can appear accurate by favoring the more common
+-class while missing many cases in the other class. The training script records
+-the observed class distributions and model metrics in `outputs/metrics.json`
+-when run. The generated dataset currently contains 1,024 attended records
+-(51.2%) and 976 no-show records (48.8%); this count was checked from the
+-generated CSV and is not a model result. Validation and test metrics are
+-recorded in `outputs/metrics.json`.
+-
+-`evaluate.py` reconstructs the same seeded, stratified 70/15/15 split and loads
+-the saved pipeline without fitting or saving a model. It reports metrics at
+-fixed classification thresholds on validation data only, then reports ROC-AUC,
+-Brier scores, and calibration-bin counts on the test data as final evaluation.
+-The test results must not be used to select a threshold. A lower threshold
+-typically flags more records, increasing recall while also increasing false
+-positives; a higher threshold typically reduces flags and false positives but
+-misses more positive cases. These diagnostics describe only the synthetic
+-dataset and do not establish real-world validity or proven calibration.
++logistic regression on validation binary F1. The Logistic Regression uses
++scikit-learn's default `predict()` decision threshold of 0.5. Model selection
++uses validation F1 at that default behavior; training does not tune or select
++another threshold. It evaluates the selected model once on the held-out test
++set and records accuracy, precision, recall, F1-score, confusion matrix,
++ROC-AUC, and aggregate false-positive and false-negative counts in
++`outputs/metrics.json`. Accuracy alone can be misleading: a model may favor a
++more common class while missing cases in the other class.
++
++`evaluate.py` reconstructs the same seeded, stratified split (1,400 train,
++300 validation, 300 test) and loads the saved pipeline without fitting or
++saving models or outputs. Its train and validation classification metrics use
++the saved model's `predict()` behavior. The fixed-threshold comparison uses
++validation probabilities only; it reports thresholds 0.30-0.70 and does not
++automatically choose one. Lower thresholds generally flag more records,
++increasing recall and false positives; higher thresholds generally reduce
++flags and false positives while missing more positive cases. The current
++Logistic Regression's default decision threshold remains 0.5.
++
++The test split is reserved for final evaluation. `evaluate.py` reports test
++ROC-AUC, Brier score, prevalence-baseline Brier score, calibration-bin counts,
++and subgroup error counts using the saved pipeline's existing predictions
++(Logistic Regression's default threshold of 0.5). Subgroups are lead-time
++bands `0-14`, `15-29`, `30-44`, and `45-60` days, plus `sms_reminder=yes` and
++`sms_reminder=no`. Each group reports total records, actual no-shows, predicted
++no-shows, false positives, and false negatives. These counts describe the
++held-out synthetic test split only; they are not used to select a model or
++threshold.
++
++A false positive is an attended synthetic record predicted as a no-show; a
++false negative is a synthetic no-show predicted as attended. Both matter:
++false alarms can cause unnecessary follow-up, while misses fail to flag
++positive examples. The dataset does not measure consequences for actual
++patients. Subgroup counts can be small and unstable, so differences are
++descriptive only; they do not establish bias, causation, fairness, or
++real-world performance. No threshold, model, or clinical decision should be
++selected from the test subgroup results.
+ 
+ `diagnostics.py` uses a fixed-seed, 5-fold stratified cross-validation and
+ learning curve on the training partition only. Preprocessing remains inside
+@@ -125,7 +170,13 @@ score difference is a general improvement.
+ 
+ The fitted pipeline artifact is generated by `train.py`; it is not a
+ hand-authored model and can be recreated by running the documented commands in
+-the documented compatible environment.
++the documented compatible environment. Each training run writes a human-readable
++display version to the verified metadata sidecar. A fresh artifact starts at
++`No-Show Model v1`; retraining increments the prior metadata version, while a
++legacy sidecar without a display version is treated as v1 so its next training
++run becomes v2. After training, update both trusted SHA-256 configuration
++values as described above; ordinary API requests and application restarts do
++not increment the display version.
+ 
+ ## Prediction API
+ 
+diff --git a/backend/ml/artifacts/no_show_pipeline.metadata.json b/backend/ml/artifacts/no_show_pipeline.metadata.json
+new file mode 100644
+index 0000000..0192cf3
+--- /dev/null
++++ b/backend/ml/artifacts/no_show_pipeline.metadata.json
+@@ -0,0 +1,21 @@
++{
++  "metadata_schema_version": 1,
++  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
++  "display_version": "No-Show Model v1",
++  "artifact_sha256": "4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
++  "feature_names": [
++    "days_ahead",
++    "previous_no_shows",
++    "sms_reminder",
++    "weekday"
++  ],
++  "positive_class": 1,
++  "python_version": "3.13.17",
++  "dependencies": {
++    "joblib": "1.4.2",
++    "numpy": "2.5.4",
++    "pandas": "2.2.3",
++    "scikit-learn": "1.5.2",
++    "scipy": "1.18.1"
++  }
++}
+diff --git a/backend/ml/evaluate.py b/backend/ml/evaluate.py
+index ad9464b..a4ddc15 100644
+--- a/backend/ml/evaluate.py
++++ b/backend/ml/evaluate.py
+@@ -29,6 +29,9 @@ FEATURE_NAMES = [
+ TARGET = "no_show"
+ THRESHOLDS = (0.30, 0.40, 0.50, 0.60, 0.70)
+ CALIBRATION_BIN_COUNT = 5
++LEAD_TIME_BINS = (0, 15, 30, 45, 61)
++LEAD_TIME_LABELS = ("0-14", "15-29", "30-44", "45-60")
++SMS_REMINDER_CATEGORIES = ("yes", "no")
+ 
+ 
+ def positive_class_probabilities(model, features: pd.DataFrame) -> np.ndarray:
+@@ -121,6 +124,73 @@ def calibration_bins(
+     return results
+ 
+ 
++def subgroup_error_counts(
++    actual: np.ndarray,
++    predicted: np.ndarray,
++) -> dict[str, int]:
++    return {
++        "n": int(len(actual)),
++        "actual_no_show_count": int((actual == 1).sum()),
++        "predicted_no_show_count": int((predicted == 1).sum()),
++        "false_positives": int(((actual == 0) & (predicted == 1)).sum()),
++        "false_negatives": int(((actual == 1) & (predicted == 0)).sum()),
++    }
++
++
++def test_subgroup_error_analysis(
++    features: pd.DataFrame,
++    target: pd.Series,
++    predictions: np.ndarray,
++) -> dict[str, object]:
++    groups = pd.DataFrame(
++        {
++            "days_ahead": features["days_ahead"].to_numpy(),
++            "sms_reminder": features["sms_reminder"].to_numpy(),
++            "actual": target.to_numpy(),
++            "predicted": predictions,
++        }
++    )
++    groups["lead_time_group"] = pd.cut(
++        groups["days_ahead"],
++        bins=LEAD_TIME_BINS,
++        labels=LEAD_TIME_LABELS,
++        right=False,
++    )
++    if groups["lead_time_group"].isna().any():
++        raise ValueError("Test data has days_ahead outside the documented 0-60 range.")
++    if not groups["sms_reminder"].isin(SMS_REMINDER_CATEGORIES).all():
++        raise ValueError("Test data has an invalid sms_reminder category.")
++
++    lead_time_counts = []
++    for label in LEAD_TIME_LABELS:
++        subgroup = groups[groups["lead_time_group"] == label]
++        counts = subgroup_error_counts(
++            subgroup["actual"].to_numpy(),
++            subgroup["predicted"].to_numpy(),
++        )
++        lead_time_counts.append({"group": label, **counts})
++
++    sms_reminder_counts = []
++    for category in SMS_REMINDER_CATEGORIES:
++        subgroup = groups[groups["sms_reminder"] == category]
++        counts = subgroup_error_counts(
++            subgroup["actual"].to_numpy(),
++            subgroup["predicted"].to_numpy(),
++        )
++        sms_reminder_counts.append({"group": category, **counts})
++
++    return {
++        "positive_class": "no_show=1",
++        "decision_threshold": 0.5,
++        "prediction_source": (
++            "Saved pipeline predict(); LogisticRegression uses its default "
++            "0.5 decision threshold."
++        ),
++        "lead_time_days_ahead": lead_time_counts,
++        "sms_reminder": sms_reminder_counts,
++    }
++
++
+ def main() -> None:
+     data = pd.read_csv(DATA_PATH)
+     features = data[FEATURE_NAMES]
+@@ -158,6 +228,7 @@ def main() -> None:
+         model, validation_features
+     )
+     test_probabilities = positive_class_probabilities(model, test_features)
++    test_predictions = model.predict(test_features)
+ 
+     test_prevalence = float(test_target.mean())
+     results = {
+@@ -189,6 +260,11 @@ def main() -> None:
+             "mean_predicted_probability": float(test_probabilities.mean()),
+             "calibration_bins": calibration_bins(test_target, test_probabilities),
+         },
++        "test_subgroup_error_analysis": test_subgroup_error_analysis(
++            test_features,
++            test_target,
++            test_predictions,
++        ),
+     }
+     print(json.dumps(results, indent=2))
+ 
+diff --git a/backend/ml/outputs/metrics.json b/backend/ml/outputs/metrics.json
+index 9e3c0c3..95dfe4b 100644
+--- a/backend/ml/outputs/metrics.json
++++ b/backend/ml/outputs/metrics.json
+@@ -1,5 +1,5 @@
+ {
+-  "model_version": "no-show-v1",
++  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
+   "random_seed": 42,
+   "split_strategy": "Stratified 70% train, 15% validation, 15% test",
+   "split_sizes": {
+diff --git a/backend/ml/train.py b/backend/ml/train.py
+index 5176a38..ddf04c8 100644
+--- a/backend/ml/train.py
++++ b/backend/ml/train.py
+@@ -1,6 +1,10 @@
+ """Train, compare, and evaluate baseline and logistic-regression pipelines."""
+ 
++import hashlib
++import importlib.metadata
+ import json
++import platform
++import re
+ from pathlib import Path
+ 
+ import joblib
+@@ -23,14 +27,72 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
+ 
+ 
+ SEED = 42
+-MODEL_VERSION = "no-show-v1"
+ DATA_PATH = Path(__file__).parent / "data" / "synthetic_appointments.csv"
+ OUTPUT_DIR = Path(__file__).parent / "outputs"
+ ARTIFACT_DIR = Path(__file__).parent / "artifacts"
++ARTIFACT_PATH = ARTIFACT_DIR / "no_show_pipeline.joblib"
++ARTIFACT_METADATA_PATH = ARTIFACT_DIR / "no_show_pipeline.metadata.json"
++ML_DEPENDENCIES = ("joblib", "numpy", "pandas", "scikit-learn", "scipy")
+ NUMERIC_FEATURES = ["days_ahead", "previous_no_shows"]
+ CATEGORICAL_FEATURES = ["sms_reminder", "weekday"]
+ FEATURE_NAMES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+ TARGET = "no_show"
++DISPLAY_VERSION_PATTERN = re.compile(r"^No-Show Model v([1-9][0-9]*)$")
++
++
++def next_display_version() -> str:
++    if not ARTIFACT_METADATA_PATH.exists():
++        if ARTIFACT_PATH.exists():
++            raise RuntimeError(
++                "Existing model artifact has no metadata; refusing to reset "
++                "its display version."
++            )
++        return "No-Show Model v1"
++
++    try:
++        previous_metadata = json.loads(
++            ARTIFACT_METADATA_PATH.read_text(encoding="utf-8")
++        )
++    except (OSError, json.JSONDecodeError) as error:
++        raise RuntimeError(
++            "Cannot determine the next model display version from metadata."
++        ) from error
++
++    if not isinstance(previous_metadata, dict):
++        raise RuntimeError("Existing model metadata is invalid.")
++    if (
++        type(previous_metadata.get("metadata_schema_version")) is not int
++        or previous_metadata["metadata_schema_version"] != 1
++    ):
++        raise RuntimeError("Existing model metadata schema is unsupported.")
++
++    artifact_digest = previous_metadata.get("artifact_sha256")
++    if (
++        not isinstance(artifact_digest, str)
++        or not re.fullmatch(r"[0-9a-f]{64}", artifact_digest)
++        or previous_metadata.get("model_version") != f"no-show-{artifact_digest}"
++    ):
++        raise RuntimeError("Existing model metadata is not bound to its artifact.")
++    if ARTIFACT_PATH.exists():
++        existing_artifact_digest = hashlib.sha256(
++            ARTIFACT_PATH.read_bytes()
++        ).hexdigest()
++        if existing_artifact_digest != artifact_digest:
++            raise RuntimeError("Existing model metadata does not match its artifact.")
++
++    if "display_version" not in previous_metadata:
++        previous_version_number = 1
++    else:
++        match = DISPLAY_VERSION_PATTERN.fullmatch(
++            previous_metadata["display_version"]
++            if isinstance(previous_metadata["display_version"], str)
++            else ""
++        )
++        if match is None:
++            raise RuntimeError("Existing model display version is invalid.")
++        previous_version_number = int(match.group(1))
++
++    return f"No-Show Model v{previous_version_number + 1}"
+ 
+ 
+ def make_preprocessor() -> ColumnTransformer:
+@@ -156,6 +218,33 @@ def main() -> None:
+     false_positives = confusion[0][1]
+     false_negatives = confusion[1][0]
+ 
++    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
++    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
++    display_version = next_display_version()
++    joblib.dump(selected_model, ARTIFACT_PATH)
++    artifact_sha256 = hashlib.sha256(ARTIFACT_PATH.read_bytes()).hexdigest()
++    model_version = f"no-show-{artifact_sha256}"
++    artifact_metadata = {
++        "metadata_schema_version": 1,
++        "model_version": model_version,
++        "display_version": display_version,
++        "artifact_sha256": artifact_sha256,
++        "feature_names": FEATURE_NAMES,
++        "positive_class": 1,
++        "python_version": platform.python_version(),
++        "dependencies": {
++            dependency: importlib.metadata.version(dependency)
++            for dependency in ML_DEPENDENCIES
++        },
++    }
++    ARTIFACT_METADATA_PATH.write_text(
++        json.dumps(artifact_metadata, indent=2) + "\n",
++        encoding="utf-8",
++    )
++    metadata_sha256 = hashlib.sha256(
++        ARTIFACT_METADATA_PATH.read_bytes()
++    ).hexdigest()
++
+     split_sizes = {
+         "train": len(train_features),
+         "validation": len(validation_features),
+@@ -168,7 +257,7 @@ def main() -> None:
+         "test": class_distribution(test_target),
+     }
+     metadata = {
+-        "model_version": MODEL_VERSION,
++        "model_version": model_version,
+         "random_seed": SEED,
+         "split_strategy": "Stratified 70% train, 15% validation, 15% test",
+         "split_sizes": split_sizes,
+@@ -194,11 +283,7 @@ def main() -> None:
+         ),
+     }
+ 
+-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+-    artifact_path = ARTIFACT_DIR / "no_show_pipeline.joblib"
+     metrics_path = OUTPUT_DIR / "metrics.json"
+-    joblib.dump(selected_model, artifact_path)
+     metrics_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+ 
+     print(f"Split sizes: {split_sizes}")
+@@ -213,7 +298,10 @@ def main() -> None:
+         f"{false_negatives} false negatives."
+     )
+     print(metadata["accuracy_note"])
+-    print(f"Saved fitted pipeline: {artifact_path}")
++    print(f"Saved fitted pipeline: {ARTIFACT_PATH}")
++    print(f"Saved artifact metadata: {ARTIFACT_METADATA_PATH}")
++    print(f"Trusted artifact SHA-256: {artifact_sha256}")
++    print(f"Trusted metadata SHA-256: {metadata_sha256}")
+     print(f"Saved metrics and metadata: {metrics_path}")
+ 
+ 
+diff --git a/backend/predictions/tests.py b/backend/predictions/tests.py
+index 6a17637..c521db0 100644
+--- a/backend/predictions/tests.py
++++ b/backend/predictions/tests.py
+@@ -1,15 +1,29 @@
++import hashlib
++import importlib.metadata
++import json
++import os
++import platform
++import tempfile
++from pathlib import Path
+ from unittest.mock import patch
+ 
+-from django.test import SimpleTestCase
++import joblib
++from django.contrib.auth import get_user_model
++from django.test import SimpleTestCase, TestCase
+ from rest_framework import status
+ from rest_framework.permissions import AllowAny
+ from rest_framework.test import APIClient
++from rest_framework_simplejwt.tokens import AccessToken
+ 
+-from .views import ModelArtifactUnavailable, NoShowPredictionView
++from ml import train as ml_train
++
++from . import views
++from .views import DEPENDENCIES, FEATURE_NAMES, ModelArtifactUnavailable
+ 
+ 
+ class FakePipeline:
+     classes_ = [0, 1]
++    feature_names_in_ = FEATURE_NAMES
+ 
+     def predict(self, features):
+         return [1]
+@@ -18,6 +32,56 @@ class FakePipeline:
+         return [[0.27, 0.73]]
+ 
+ 
++class PipelineWithoutProbabilities:
++    classes_ = [0, 1]
++    feature_names_in_ = FEATURE_NAMES
++
++    def predict(self, features):
++        return [1]
++
++
++class PipelineWithInvalidProbabilities(FakePipeline):
++    def predict_proba(self, features):
++        return [[0.27]]
++
++
++class PipelineWithNonFiniteProbabilities(FakePipeline):
++    def predict_proba(self, features):
++        return [[float("nan"), 0.73]]
++
++
++class PipelineWithOutOfRangeProbabilities(FakePipeline):
++    def predict_proba(self, features):
++        return [[0.27, 1.73]]
++
++
++class PipelineWithReorderedClasses(FakePipeline):
++    classes_ = [1, 0]
++
++    def predict_proba(self, features):
++        return [[0.73, 0.27]]
++
++
++class WrongSchemaPipeline(FakePipeline):
++    feature_names_in_ = tuple(reversed(FEATURE_NAMES))
++
++
++def build_metadata(artifact_digest, feature_names=None):
++    return {
++        "metadata_schema_version": 1,
++        "model_version": f"no-show-{artifact_digest}",
++        "display_version": "No-Show Model v1",
++        "artifact_sha256": artifact_digest,
++        "feature_names": list(feature_names or FEATURE_NAMES),
++        "positive_class": 1,
++        "python_version": platform.python_version(),
++        "dependencies": {
++            dependency: importlib.metadata.version(dependency)
++            for dependency in DEPENDENCIES
++        },
++    }
++
++
+ class NoShowPredictionApiTests(SimpleTestCase):
+     url = "/api/v1/predictions/no-show/"
+     valid_payload = {
+@@ -30,7 +94,7 @@ class NoShowPredictionApiTests(SimpleTestCase):
+     def setUp(self):
+         self.client = APIClient()
+         permissions_patch = patch.object(
+-            NoShowPredictionView,
++            views.NoShowPredictionView,
+             "permission_classes",
+             [AllowAny],
+         )
+@@ -38,7 +102,17 @@ class NoShowPredictionApiTests(SimpleTestCase):
+         self.addCleanup(permissions_patch.stop)
+ 
+     @patch("predictions.views.make_feature_frame", return_value=object())
+-    @patch("predictions.views.load_pipeline", return_value=FakePipeline())
++    @patch(
++        "predictions.views.load_pipeline",
++        return_value=(
++            FakePipeline(),
++            {
++                "model_version": "test-no-show-version",
++                "display_version": "No-Show Model v1",
++                "positive_class": 1,
++            },
++        ),
++    )
+     def test_valid_request_returns_synthetic_prediction(
+         self,
+         load_pipeline,
+@@ -47,7 +121,8 @@ class NoShowPredictionApiTests(SimpleTestCase):
+         response = self.client.post(self.url, self.valid_payload, format="json")
+ 
+         self.assertEqual(response.status_code, status.HTTP_200_OK)
+-        self.assertEqual(response.data["model_version"], "no-show-v1")
++        self.assertEqual(response.data["model_version"], "test-no-show-version")
++        self.assertEqual(response.data["display_version"], "No-Show Model v1")
+         self.assertEqual(response.data["predicted_class"], 1)
+         self.assertEqual(response.data["predicted_label"], "no_show")
+         self.assertEqual(response.data["probability_no_show"], 0.73)
+@@ -93,7 +168,17 @@ class NoShowPredictionApiTests(SimpleTestCase):
+                 self.assertIn(field, response.data)
+ 
+     @patch("predictions.views.make_feature_frame", return_value=object())
+-    @patch("predictions.views.load_pipeline", return_value=FakePipeline())
++    @patch(
++        "predictions.views.load_pipeline",
++        return_value=(
++            FakePipeline(),
++            {
++                "model_version": "test-no-show-version",
++                "display_version": "No-Show Model v1",
++                "positive_class": 1,
++            },
++        ),
++    )
+     def test_response_contains_class_label_probability_and_notice(
+         self,
+         load_pipeline,
+@@ -105,6 +190,7 @@ class NoShowPredictionApiTests(SimpleTestCase):
+             set(response.data),
+             {
+                 "model_version",
++                "display_version",
+                 "predicted_class",
+                 "predicted_label",
+                 "probability_no_show",
+@@ -113,11 +199,93 @@ class NoShowPredictionApiTests(SimpleTestCase):
+         )
+         self.assertIsInstance(response.data["probability_no_show"], float)
+ 
++    @patch("predictions.views.make_feature_frame", return_value=object())
++    @patch(
++        "predictions.views.load_pipeline",
++        return_value=(
++            PipelineWithInvalidProbabilities(),
++            {
++                "model_version": "test-no-show-version",
++                "display_version": "No-Show Model v1",
++                "positive_class": 1,
++            },
++        ),
++    )
++    def test_invalid_probability_output_returns_safe_server_error(
++        self,
++        load_pipeline,
++        make_feature_frame,
++    ):
++        response = self.client.post(self.url, self.valid_payload, format="json")
++
++        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
++        self.assertEqual(
++            response.data,
++            {"detail": "The prediction model is temporarily unavailable."},
++        )
++
++    def test_probability_uses_actual_positive_class_index(self):
++        with (
++            patch(
++                "predictions.views.make_feature_frame",
++                return_value=object(),
++            ),
++            patch(
++                "predictions.views.load_pipeline",
++                return_value=(
++                    PipelineWithReorderedClasses(),
++                    {
++                        "model_version": "test-no-show-version",
++                        "display_version": "No-Show Model v1",
++                        "positive_class": 1,
++                    },
++                ),
++            ),
++        ):
++            response = self.client.post(self.url, self.valid_payload, format="json")
++
++        self.assertEqual(response.status_code, status.HTTP_200_OK)
++        self.assertEqual(response.data["probability_no_show"], 0.73)
++
++    def test_non_finite_and_out_of_range_probabilities_return_503(self):
++        for model in (
++            PipelineWithNonFiniteProbabilities(),
++            PipelineWithOutOfRangeProbabilities(),
++        ):
++            with self.subTest(model=type(model).__name__):
++                with (
++                    patch(
++                        "predictions.views.make_feature_frame",
++                        return_value=object(),
++                    ),
++                    patch(
++                        "predictions.views.load_pipeline",
++                        return_value=(
++                            model,
++                            {
++                                "model_version": "test-no-show-version",
++                                "display_version": "No-Show Model v1",
++                                "positive_class": 1,
++                            },
++                        ),
++                    ),
++                ):
++                    response = self.client.post(
++                        self.url,
++                        self.valid_payload,
++                        format="json",
++                    )
++
++                self.assertEqual(
++                    response.status_code,
++                    status.HTTP_503_SERVICE_UNAVAILABLE,
++                )
++
+     @patch(
+         "predictions.views.load_pipeline",
+         side_effect=ModelArtifactUnavailable,
+     )
+-    def test_missing_model_returns_safe_server_error(self, load_pipeline):
++    def test_unavailable_model_returns_safe_server_error(self, load_pipeline):
+         response = self.client.post(self.url, self.valid_payload, format="json")
+ 
+         self.assertEqual(
+@@ -128,3 +296,371 @@ class NoShowPredictionApiTests(SimpleTestCase):
+             response.data,
+             {"detail": "The prediction model is temporarily unavailable."},
+         )
++
++
++class ModelArtifactValidationTests(SimpleTestCase):
++    url = "/api/v1/predictions/no-show/"
++    valid_payload = NoShowPredictionApiTests.valid_payload
++
++    def setUp(self):
++        self.client = APIClient()
++        permissions_patch = patch.object(
++            views.NoShowPredictionView,
++            "permission_classes",
++            [AllowAny],
++        )
++        permissions_patch.start()
++        self.addCleanup(permissions_patch.stop)
++
++        self.temp_dir = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temp_dir.cleanup)
++        temp_path = Path(self.temp_dir.name)
++        self.artifact_path = temp_path / "pipeline.joblib"
++        self.metadata_path = temp_path / "pipeline.metadata.json"
++        paths_patch = patch.multiple(
++            "predictions.views",
++            MODEL_PATH=self.artifact_path,
++            MODEL_METADATA_PATH=self.metadata_path,
++        )
++        paths_patch.start()
++        self.addCleanup(paths_patch.stop)
++        self.env_patch = patch.dict(
++            os.environ,
++            {
++                views.ARTIFACT_DIGEST_ENV: "0" * 64,
++                views.METADATA_DIGEST_ENV: "0" * 64,
++            },
++        )
++        self.env_patch.start()
++        self.addCleanup(self.env_patch.stop)
++        self.addCleanup(views.load_pipeline.cache_clear)
++        views.load_pipeline.cache_clear()
++
++    def write_bundle(
++        self,
++        model=None,
++        feature_names=None,
++        write_metadata=True,
++    ):
++        joblib.dump(model or FakePipeline(), self.artifact_path)
++        artifact_digest = hashlib.sha256(self.artifact_path.read_bytes()).hexdigest()
++        metadata = build_metadata(artifact_digest, feature_names=feature_names)
++        metadata_bytes = json.dumps(metadata).encode("utf-8")
++        os.environ[views.ARTIFACT_DIGEST_ENV] = artifact_digest
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        if write_metadata:
++            self.metadata_path.write_bytes(metadata_bytes)
++        views.load_pipeline.cache_clear()
++        return artifact_digest
++
++    def post_prediction(self):
++        return self.client.post(self.url, self.valid_payload, format="json")
++
++    def assert_safe_unavailable(self, response):
++        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
++        self.assertEqual(
++            response.data,
++            {"detail": "The prediction model is temporarily unavailable."},
++        )
++        self.assertNotIn(self.temp_dir.name, str(response.data))
++
++    def test_missing_artifact_returns_safe_server_error(self):
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_missing_metadata_returns_safe_server_error(self):
++        self.write_bundle(write_metadata=False)
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_malformed_metadata_returns_safe_server_error(self):
++        joblib.dump(FakePipeline(), self.artifact_path)
++        artifact_digest = hashlib.sha256(self.artifact_path.read_bytes()).hexdigest()
++        metadata_bytes = b"{malformed json"
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.ARTIFACT_DIGEST_ENV] = artifact_digest
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_digest_mismatch_is_detected_before_deserialization(self):
++        self.write_bundle()
++        os.environ[views.ARTIFACT_DIGEST_ENV] = "f" * 64
++        views.load_pipeline.cache_clear()
++
++        with patch("joblib.load") as deserialize:
++            response = self.post_prediction()
++
++        self.assert_safe_unavailable(response)
++        deserialize.assert_not_called()
++
++    def test_metadata_digest_mismatch_is_detected_before_deserialization(self):
++        self.write_bundle()
++        os.environ[views.METADATA_DIGEST_ENV] = "f" * 64
++        views.load_pipeline.cache_clear()
++
++        with patch("joblib.load") as deserialize:
++            response = self.post_prediction()
++
++        self.assert_safe_unavailable(response)
++        deserialize.assert_not_called()
++
++    def test_model_version_must_match_verified_artifact_digest(self):
++        artifact_digest = self.write_bundle()
++        metadata = build_metadata(artifact_digest)
++        metadata["model_version"] = "no-show-unbound-version"
++        metadata_bytes = json.dumps(metadata).encode("utf-8")
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_missing_display_version_returns_safe_server_error(self):
++        artifact_digest = self.write_bundle()
++        metadata = build_metadata(artifact_digest)
++        del metadata["display_version"]
++        metadata_bytes = json.dumps(metadata).encode("utf-8")
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_invalid_display_version_returns_safe_server_error(self):
++        artifact_digest = self.write_bundle()
++        metadata = build_metadata(artifact_digest)
++        metadata["display_version"] = "No-Show Model v0"
++        metadata_bytes = json.dumps(metadata).encode("utf-8")
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_incompatible_dependency_metadata_returns_safe_server_error(self):
++        artifact_digest = self.write_bundle()
++        metadata = build_metadata(artifact_digest)
++        metadata["dependencies"]["scikit-learn"] = "0.0"
++        metadata_bytes = json.dumps(metadata).encode("utf-8")
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_corrupted_artifact_returns_safe_server_error(self):
++        corrupt_bytes = b"not a serialized model"
++        self.artifact_path.write_bytes(corrupt_bytes)
++        artifact_digest = hashlib.sha256(corrupt_bytes).hexdigest()
++        metadata_bytes = json.dumps(build_metadata(artifact_digest)).encode("utf-8")
++        self.metadata_path.write_bytes(metadata_bytes)
++        os.environ[views.ARTIFACT_DIGEST_ENV] = artifact_digest
++        os.environ[views.METADATA_DIGEST_ENV] = hashlib.sha256(
++            metadata_bytes
++        ).hexdigest()
++        views.load_pipeline.cache_clear()
++
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_metadata_schema_mismatch_returns_safe_server_error(self):
++        self.write_bundle(feature_names=reversed(FEATURE_NAMES))
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_pipeline_schema_mismatch_returns_safe_server_error(self):
++        self.write_bundle(model=WrongSchemaPipeline())
++        self.assert_safe_unavailable(self.post_prediction())
++
++    def test_unsupported_probability_output_returns_safe_server_error(self):
++        self.write_bundle(model=PipelineWithoutProbabilities())
++        self.assert_safe_unavailable(self.post_prediction())
++
++
++class RealArtifactAuthenticatedIntegrationTests(TestCase):
++    url = "/api/v1/predictions/no-show/"
++    payload = NoShowPredictionApiTests.valid_payload
++
++    def setUp(self):
++        self.client = APIClient()
++        self.temp_dir = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temp_dir.cleanup)
++        self.addCleanup(views.load_pipeline.cache_clear)
++        views.load_pipeline.cache_clear()
++
++        self.artifact_path = views.MODEL_PATH
++        if not self.artifact_path.is_file():
++            self.fail(f"The trained pipeline is missing: {self.artifact_path}")
++
++        artifact_digest = hashlib.sha256(self.artifact_path.read_bytes()).hexdigest()
++        metadata_bytes = json.dumps(build_metadata(artifact_digest)).encode("utf-8")
++        metadata_path = Path(self.temp_dir.name) / "pipeline.metadata.json"
++        metadata_path.write_bytes(metadata_bytes)
++        self.metadata_path_patch = patch.object(
++            views,
++            "MODEL_METADATA_PATH",
++            metadata_path,
++        )
++        self.metadata_path_patch.start()
++        self.addCleanup(self.metadata_path_patch.stop)
++        self.env_patch = patch.dict(
++            os.environ,
++            {
++                views.ARTIFACT_DIGEST_ENV: artifact_digest,
++                views.METADATA_DIGEST_ENV: hashlib.sha256(
++                    metadata_bytes
++                ).hexdigest(),
++            },
++        )
++        self.env_patch.start()
++        self.addCleanup(self.env_patch.stop)
++
++    def test_authenticated_request_uses_saved_pipeline_and_verified_version(self):
++        unauthenticated_response = self.client.post(
++            self.url,
++            self.payload,
++            format="json",
++        )
++        self.assertEqual(
++            unauthenticated_response.status_code,
++            status.HTTP_401_UNAUTHORIZED,
++        )
++
++        user_model = get_user_model()
++        user = user_model.objects.create_user(
++            email="prediction-integration@example.test",
++            password="test-password-for-prediction",
++        )
++        token = AccessToken.for_user(user)
++        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
++
++        response = self.client.post(self.url, self.payload, format="json")
++
++        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
++        expected_digest = os.environ[views.ARTIFACT_DIGEST_ENV]
++        self.assertEqual(
++            response.data["model_version"],
++            f"no-show-{expected_digest}",
++        )
++        self.assertEqual(response.data["display_version"], "No-Show Model v1")
++        self.assertIn("predicted_class", response.data)
++        self.assertGreaterEqual(response.data["probability_no_show"], 0)
++        self.assertLessEqual(response.data["probability_no_show"], 1)
++        self.assertIn("synthetic", response.data["notice"])
++
++    def test_wrong_role_is_rejected(self):
++        user_model = get_user_model()
++        admin = user_model.objects.create_superuser(
++            email="prediction-admin@example.test",
++            password="test-password-for-prediction",
++        )
++        token = AccessToken.for_user(admin)
++        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
++
++        response = self.client.post(self.url, self.payload, format="json")
++
++        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
++
++    def test_authenticated_invalid_input_returns_bad_request(self):
++        user_model = get_user_model()
++        user = user_model.objects.create_user(
++            email="prediction-invalid@example.test",
++            password="test-password-for-prediction",
++        )
++        token = AccessToken.for_user(user)
++        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
++
++        response = self.client.post(
++            self.url,
++            {**self.payload, "days_ahead": 61},
++            format="json",
++        )
++
++        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
++        self.assertIn("days_ahead", response.data)
++
++    def test_authenticated_missing_artifact_returns_safe_server_error(self):
++        user_model = get_user_model()
++        user = user_model.objects.create_user(
++            email="prediction-missing-model@example.test",
++            password="test-password-for-prediction",
++        )
++        token = AccessToken.for_user(user)
++        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
++        missing_artifact = Path(self.temp_dir.name) / "missing-pipeline.joblib"
++
++        with patch.object(views, "MODEL_PATH", missing_artifact):
++            views.load_pipeline.cache_clear()
++            response = self.client.post(self.url, self.payload, format="json")
++
++        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
++        self.assertEqual(
++            response.data,
++            {"detail": "The prediction model is temporarily unavailable."},
++        )
++
++
++class ModelDisplayVersionGenerationTests(SimpleTestCase):
++    def setUp(self):
++        self.temp_dir = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temp_dir.cleanup)
++        root = Path(self.temp_dir.name)
++        artifact_path = root / "pipeline.joblib"
++        metadata_path = root / "pipeline.metadata.json"
++        patcher = patch.multiple(
++            ml_train,
++            ARTIFACT_PATH=artifact_path,
++            ARTIFACT_METADATA_PATH=metadata_path,
++        )
++        patcher.start()
++        self.addCleanup(patcher.stop)
++        self.artifact_path = artifact_path
++        self.metadata_path = metadata_path
++
++    def write_previous_metadata(self, display_version=None):
++        digest = "a" * 64
++        metadata = {
++            "metadata_schema_version": 1,
++            "model_version": f"no-show-{digest}",
++            "artifact_sha256": digest,
++        }
++        if display_version is not None:
++            metadata["display_version"] = display_version
++        self.metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
++
++    def test_first_training_starts_at_v1(self):
++        self.assertEqual(ml_train.next_display_version(), "No-Show Model v1")
++
++    def test_legacy_metadata_advances_to_v2(self):
++        self.write_previous_metadata()
++
++        self.assertEqual(ml_train.next_display_version(), "No-Show Model v2")
++
++    def test_retraining_advances_saved_version_from_v1_to_v2_to_v3(self):
++        self.write_previous_metadata("No-Show Model v1")
++        self.assertEqual(ml_train.next_display_version(), "No-Show Model v2")
++
++        self.write_previous_metadata("No-Show Model v2")
++        self.assertEqual(ml_train.next_display_version(), "No-Show Model v3")
++
++    def test_invalid_previous_version_refuses_to_reset_counter(self):
++        self.write_previous_metadata("No-Show Model v0")
++
++        with self.assertRaises(RuntimeError):
++            ml_train.next_display_version()
++
++    def test_missing_metadata_for_existing_artifact_refuses_to_reset_counter(self):
++        self.artifact_path.write_bytes(b"existing artifact")
++
++        with self.assertRaises(RuntimeError):
++            ml_train.next_display_version()
+diff --git a/backend/predictions/views.py b/backend/predictions/views.py
+index 9330af6..7093c6a 100644
+--- a/backend/predictions/views.py
++++ b/backend/predictions/views.py
+@@ -1,7 +1,16 @@
++import hashlib
++import hmac
++import importlib.metadata
++import io
++import json
+ import logging
++import os
++import platform
++import re
+ from functools import lru_cache
+ from pathlib import Path
+ 
++import numpy as np
+ from rest_framework import status
+ from rest_framework.response import Response
+ from rest_framework.views import APIView
+@@ -22,6 +31,11 @@ MODEL_PATH = (
+     / "artifacts"
+     / "no_show_pipeline.joblib"
+ )
++MODEL_METADATA_PATH = MODEL_PATH.with_name("no_show_pipeline.metadata.json")
++ARTIFACT_DIGEST_ENV = "NO_SHOW_MODEL_SHA256"
++METADATA_DIGEST_ENV = "NO_SHOW_MODEL_METADATA_SHA256"
++DEPENDENCIES = ("joblib", "numpy", "pandas", "scikit-learn", "scipy")
++SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+ EXPERIMENTAL_NOTICE = (
+     "Experimental prediction from a fully synthetic educational dataset; "
+     "not a clinical or real-world risk estimate."
+@@ -38,17 +52,139 @@ def make_feature_frame(values):
+     return pd.DataFrame([values], columns=FEATURE_NAMES)
+ 
+ 
++def _configured_digest(name):
++    digest = os.environ.get(name, "").strip().lower()
++    if not SHA256_PATTERN.fullmatch(digest):
++        raise ModelArtifactUnavailable(f"{name} must be configured as a SHA-256.")
++    return digest
++
++
++def _validate_metadata(metadata, expected_artifact_digest):
++    if not isinstance(metadata, dict):
++        raise ModelArtifactUnavailable("Artifact metadata must be a JSON object.")
++
++    required_fields = {
++        "metadata_schema_version",
++        "model_version",
++        "display_version",
++        "artifact_sha256",
++        "feature_names",
++        "positive_class",
++        "python_version",
++        "dependencies",
++    }
++    if not required_fields.issubset(metadata):
++        raise ModelArtifactUnavailable("Artifact metadata is incomplete.")
++    if type(metadata["metadata_schema_version"]) is not int or metadata[
++        "metadata_schema_version"
++    ] != 1:
++        raise ModelArtifactUnavailable("Artifact metadata schema is unsupported.")
++    if (
++        not isinstance(metadata["model_version"], str)
++        or not metadata["model_version"].strip()
++    ):
++        raise ModelArtifactUnavailable("Artifact model version is invalid.")
++    if metadata["model_version"] != f"no-show-{expected_artifact_digest}":
++        raise ModelArtifactUnavailable("Artifact version is not bound to its digest.")
++    if (
++        not isinstance(metadata["display_version"], str)
++        or not re.fullmatch(
++            r"No-Show Model v[1-9][0-9]*",
++            metadata["display_version"],
++        )
++    ):
++        raise ModelArtifactUnavailable("Artifact display version is invalid.")
++    if metadata["feature_names"] != list(FEATURE_NAMES):
++        raise ModelArtifactUnavailable("Artifact feature schema does not match.")
++    if type(metadata["positive_class"]) is not int or metadata["positive_class"] != 1:
++        raise ModelArtifactUnavailable("Artifact positive class must be no_show=1.")
++    if metadata["artifact_sha256"] != expected_artifact_digest:
++        raise ModelArtifactUnavailable("Metadata does not identify this artifact.")
++    if metadata["python_version"] != platform.python_version():
++        raise ModelArtifactUnavailable("Artifact Python version is incompatible.")
++
++    dependency_versions = metadata["dependencies"]
++    if not isinstance(dependency_versions, dict) or set(dependency_versions) != set(
++        DEPENDENCIES
++    ):
++        raise ModelArtifactUnavailable("Artifact dependency metadata is invalid.")
++    for dependency in DEPENDENCIES:
++        try:
++            installed_version = importlib.metadata.version(dependency)
++        except importlib.metadata.PackageNotFoundError as error:
++            raise ModelArtifactUnavailable(
++                f"Required dependency {dependency} is unavailable."
++            ) from error
++        if dependency_versions[dependency] != installed_version:
++            raise ModelArtifactUnavailable(
++                f"Artifact dependency {dependency} is incompatible."
++            )
++
++
++def _validate_pipeline(model):
++    if not callable(getattr(model, "predict", None)):
++        raise ModelArtifactUnavailable("Artifact does not support prediction.")
++    if not callable(getattr(model, "predict_proba", None)):
++        raise ModelArtifactUnavailable("Artifact does not support probabilities.")
++
++    feature_names = getattr(model, "feature_names_in_", None)
++    if feature_names is None or tuple(feature_names) != FEATURE_NAMES:
++        raise ModelArtifactUnavailable("Artifact feature schema does not match.")
++
++    classes = getattr(model, "classes_", None)
++    if classes is None:
++        raise ModelArtifactUnavailable("Artifact classes are unavailable.")
++    class_values = list(classes)
++    if (
++        len(class_values) != 2
++        or sum(value == 0 for value in class_values) != 1
++        or sum(value == 1 for value in class_values) != 1
++    ):
++        raise ModelArtifactUnavailable("Artifact classes must include 0 and 1.")
++
++
+ @lru_cache(maxsize=1)
+-def load_pipeline():
++def _load_verified_pipeline(expected_artifact_digest, expected_metadata_digest):
+     try:
++        artifact_bytes = MODEL_PATH.read_bytes()
++        actual_artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
++        if not hmac.compare_digest(
++            actual_artifact_digest,
++            expected_artifact_digest,
++        ):
++            raise ModelArtifactUnavailable("Model artifact digest does not match.")
++
++        metadata_bytes = MODEL_METADATA_PATH.read_bytes()
++        actual_metadata_digest = hashlib.sha256(metadata_bytes).hexdigest()
++        if not hmac.compare_digest(actual_metadata_digest, expected_metadata_digest):
++            raise ModelArtifactUnavailable("Model metadata digest does not match.")
++        metadata = json.loads(metadata_bytes)
++        _validate_metadata(metadata, expected_artifact_digest)
++
+         import joblib
+ 
+-        return joblib.load(MODEL_PATH)
++        model = joblib.load(io.BytesIO(artifact_bytes))
++        _validate_pipeline(model)
++        return model, metadata
+     except Exception as error:
+-        logger.exception("Could not load the synthetic no-show model artifact.")
++        if isinstance(error, ModelArtifactUnavailable):
++            raise
+         raise ModelArtifactUnavailable from error
+ 
+ 
++def load_pipeline():
++    try:
++        artifact_digest = _configured_digest(ARTIFACT_DIGEST_ENV)
++        metadata_digest = _configured_digest(METADATA_DIGEST_ENV)
++        return _load_verified_pipeline(artifact_digest, metadata_digest)
++    except ModelArtifactUnavailable:
++        logger.exception("Could not verify the synthetic no-show model configuration.")
++        raise
++
++
++load_pipeline.cache_clear = _load_verified_pipeline.cache_clear
++
++
+ class NoShowPredictionView(APIView):
+     def post(self, request):
+         serializer = NoShowPredictionSerializer(data=request.data)
+@@ -56,20 +192,26 @@ class NoShowPredictionView(APIView):
+             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+         try:
+-            model = load_pipeline()
++            model, metadata = load_pipeline()
+             features = make_feature_frame(serializer.validated_data)
+-            predicted_class = int(model.predict(features)[0])
+-            probability_no_show = None
+-
++            predicted_values = np.asarray(model.predict(features))
++            if predicted_values.shape != (1,) or predicted_values[0] not in (0, 1):
++                raise ValueError("Model returned an invalid predicted class.")
++            predicted_class = int(predicted_values[0])
++
++            classes = list(model.classes_)
++            positive_class_index = classes.index(metadata["positive_class"])
++            probabilities = np.asarray(model.predict_proba(features), dtype=float)
++            if probabilities.shape != (1, len(classes)):
++                raise ValueError("Model returned an invalid probability shape.")
+             if (
+-                hasattr(model, "predict_proba")
+-                and hasattr(model, "classes_")
+-                and 1 in model.classes_
++                not np.isfinite(probabilities).all()
++                or (probabilities < 0).any()
++                or (probabilities > 1).any()
++                or not np.isclose(probabilities.sum(axis=1), 1.0).all()
+             ):
+-                positive_class_index = list(model.classes_).index(1)
+-                probability_no_show = float(
+-                    model.predict_proba(features)[0][positive_class_index]
+-                )
++                raise ValueError("Model returned invalid probabilities.")
++            probability_no_show = float(probabilities[0][positive_class_index])
+         except ModelArtifactUnavailable:
+             return self._unavailable_response()
+         except Exception:
+@@ -78,7 +220,8 @@ class NoShowPredictionView(APIView):
+ 
+         return Response(
+             {
+-                "model_version": "no-show-v1",
++                "model_version": metadata["model_version"],
++                "display_version": metadata["display_version"],
+                 "predicted_class": predicted_class,
+                 "predicted_label": "no_show" if predicted_class == 1 else "attended",
+                 "probability_no_show": probability_no_show,
+diff --git a/docs/ai-workflow.md b/docs/ai-workflow.md
+index cda6609..c476f14 100644
+--- a/docs/ai-workflow.md
++++ b/docs/ai-workflow.md
+@@ -1,8 +1,8 @@
+ # AI-assisted development workflow
+ 
+ **Project:** HealthProfile
+-**Evidence focus:** Week 2 mentor-review follow-up fixes (Issues 1, 2 and 3), plus the retained earlier project history
+-**Last updated:** 2026-10-27
++**Evidence focus:** Week 2 and Week 3 mentor-review follow-up work, plus the retained earlier project history
++**Last updated:** 2026-11-03
+ 
+ ## 1. Scope and evidence
+ 
+@@ -11,7 +11,7 @@ This note records AI-assisted work on the HealthProfile project that is supporte
+ - The complete verbatim prompts from earlier project phases were not retained in the available context and are not quoted here.
+ - The two Week 2 coding prompts (Issue 1 and Issue 2) are recorded in full in Section 3.
+ - The original formal assignment file and any rubric were not found in the repository or retained context. Rubric-specific requirements must be confirmed against the original assignment source.
+-- Test results are reported from the implementation turns that produced them. The documentation author did **not** run any tests or checks while preparing this documentation. Historical results are not presented as rerun, with one exception: on 2026-10-27 the developer ran the focused admin API tests, the full backend suite, and the Django system check (Section 5.3). Frontend lint/build and `git diff --check` results have not been rerun.
++- Historical test results are attributed to their original runs. On 2026-10-27 the developer ran the focused admin API tests, the full backend suite, and the Django system check (Section 5.3). On 2026-11-03 the AI assistant ran the focused Week 3 prediction API suite and `git diff --check` for the Phase 3 documentation/test update (Section 3.5).
+ - Automated checks, manual verification, and pending work are kept distinct throughout. Nothing pending is marked complete.
+ - The developer reported manual checks of the Week 2 fixes on 2026-10-27 (Sections 3.1, 3.2 and 3.4): the Issue 1 `is_active` database transitions and the Issue 2 pagination scenario. The developer has not separately confirmed a manual check that repeated-status requests create no extra audit event; that behavior is covered only by the automated tests. Exact steps, environment, and screenshots were not retained. Manual checks are separate from the automated test results (Section 5.3 for the 2026-10-27 backend run).
+ - The developer personally reviewed the source-code changes for Issues 1, 2 and 3 and confirmed on 2026-10-27 that they look correct. This is a developer-reported manual review; no findings or review notes were retained, and the documentation author did not access the repository.
+@@ -323,6 +323,60 @@ Completed for the scenario above (developer-reported). Only this delayed-respons
+ | Issue 3 automated frontend race-condition test | **None added** | No frontend automated test framework available; not claimed |
+ | Issue 3 out-of-order admin directory responses | Implemented per developer report in `frontend/src/app/admin/page.tsx`; developer's source diff review completed 2026-10-27 | Separate from Issue 2; mentor concern: out-of-order responses can overwrite newer results when search or filters change quickly |
+ 
++### 3.5 Week 3 mentor follow-up
++
++The mentor reviewed the original Week 3 implementation in PR #2 at commit
++`1be90c1` (full revision
++`1be90c16884f91b934671c6e0048ac52bbda237e`). The follow-up work is on
++`week3-followup`; the Phase 1/2 implementation commit is `1b7b489`.
++
++#### Prompt refinement and implementation choices
++
++The retained conversation contains the phase-specific requests; this summary
++does not invent a separate prompt transcript:
++
++- Phase 1 narrowed the artifact concern to metadata tied to the saved
++  pipeline, a trusted digest checked before deserialization, strict schema and
++  probability validation, safe unavailable responses, and authenticated
++  real-artifact test coverage.
++- Phase 2 explicitly limited evaluation changes to the evaluator and ML
++  README, required test-set FP/FN groups by lead time and reminder category,
++  kept threshold comparisons on validation, and prohibited retraining or
++  output-file changes.
++- Phase 3 requested documentation and evidence readiness, with automated
++  coverage for the direct API and no fabricated manual-demo claims.
++
++Implementation choices followed those boundaries: the Phase 1 loader checks
++trusted artifact and metadata SHA-256 values before `joblib.load`; Phase 2
++adds descriptive test-set group counts at the existing `predict()` behavior;
++Phase 3 documents the actual routes, version format, and test/demo status.
++No model, dataset, API behavior, or frontend code was changed for Phase 3.
++
++#### Debugging and verification evidence
++
++During Phase 1 test development, an authenticated test initially used a
++plain Django `Client`, which does not provide DRF's `.credentials()` helper.
++The test was changed to use `APIClient`; the focused prediction suite then
++passed. This was a test-harness correction, not an application authentication
++change.
++
++For Phase 3, the developer requested this documentation/test scope. The AI
++assistant inspected the API permission and serializer, added automated
++wrong-role coverage, and updated the README, API reference, and this workflow
++record. The command
++`Push-Location backend; ..\.venv-integration\Scripts\python.exe manage.py test predictions.tests --verbosity 1; Pop-Location`
++passed all 23 prediction tests with no Django system-check issues. This run
++included authenticated real-artifact prediction, authenticated invalid input
++(400), anonymous access (401), wrong-role access (403), and authenticated
++missing-artifact handling (503). `git diff --check` was also run for this
++change. These are automated results, not browser or manual-demo results. The
++developer's independent review of these Phase 3 changes remains pending.
++
++The demo checklist in the root README is a set of steps still to perform
++manually. There is no retained screenshot or evidence of a manual Week 3 UI
++demo, so none is claimed. Automated API test coverage and any manual
++demonstration must remain distinguished.
++
+ ## 4. Human review and security boundaries
+ 
+ The project requirements and follow-up decisions were supplied by the developer. The retained instructions repeatedly required:
+diff --git a/docs/api-authentication.md b/docs/api-authentication.md
+index 1944efd..83f7b66 100644
+--- a/docs/api-authentication.md
++++ b/docs/api-authentication.md
+@@ -99,7 +99,8 @@ The saved pipeline currently returns this response for the example:
+ 
+ ```json
+ {
+-  "model_version": "no-show-v1",
++  "model_version": "no-show-4b891f7ecaf41b5c32039b9ad640855961fda3da5574ba7829c83943f1de48ca",
++  "display_version": "No-Show Model v1",
+   "predicted_class": 0,
+   "predicted_label": "attended",
+   "probability_no_show": 0.320676589796643,
+@@ -107,12 +108,19 @@ The saved pipeline currently returns this response for the example:
+ }
+ ```
+ 
+-Invalid or missing fields return `400`; missing or invalid authentication is
+-rejected by the configured standard-user permission. If the artifact is
+-unavailable or inference fails, the endpoint returns `503` with a generic
+-message. The probability is learned from artificial labels and is not a
+-calibrated or clinically validated real-world risk estimate. Do not use it to
+-make clinical or appointment decisions.
++`model_version` is the artifact SHA-256 prefixed with `no-show-` and remains
++available for diagnostics. `display_version` is a human-readable training
++sequence label from the independently digest-verified metadata. Invalid or
++missing fields return `400`; missing or invalid authentication returns `401`,
++and authenticated users without the standard
++role are denied with `403`. If the artifact, its metadata, trusted digests, or
++inference is unavailable, the endpoint returns `503` with the generic body
++`{"detail":"The prediction model is temporarily unavailable."}`. The trusted
++artifact and metadata digests are configured outside those replaceable files
++as `NO_SHOW_MODEL_SHA256` and `NO_SHOW_MODEL_METADATA_SHA256`. The probability
++is learned from artificial labels and is not a calibrated or clinically
++validated real-world risk estimate. Do not use it to make clinical or
++appointment decisions.
+ 
+ ## Standard-user health profile API
+ 
+diff --git a/frontend/src/components/NoShowPrediction.tsx b/frontend/src/components/NoShowPrediction.tsx
+index 7f49302..6192e6a 100644
+--- a/frontend/src/components/NoShowPrediction.tsx
++++ b/frontend/src/components/NoShowPrediction.tsx
+@@ -11,6 +11,7 @@ type PredictionInput = {
+ 
+ type PredictionResponse = {
+   model_version: string;
++  display_version: string;
+   predicted_label: "no_show" | "attended";
+   probability_no_show: number;
+   notice: string;
+@@ -60,6 +61,7 @@ function isPredictionResponse(value: unknown): value is PredictionResponse {
+   const response = value as Partial<PredictionResponse>;
+   return (
+     typeof response.model_version === "string" &&
++    typeof response.display_version === "string" &&
+     (response.predicted_label === "no_show" ||
+       response.predicted_label === "attended") &&
+     typeof response.probability_no_show === "number" &&
+@@ -329,7 +331,7 @@ export default function NoShowPrediction({
+                   Model version
+                 </dt>
+                 <dd className="mt-1 text-sm font-semibold text-slate-900">
+-                  {result.model_version}
++                  {result.display_version}
+                 </dd>
+               </div>
+             </dl>

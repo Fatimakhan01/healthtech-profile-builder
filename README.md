@@ -8,6 +8,8 @@ HealthProfile is a full-stack health-profile application with standard-user and 
 - `backend/accounts/` — custom email-based user model and standard/admin role definitions.
 - `backend/profiles/` — one-to-one health profile schema.
 - `backend/predictions/` — versioned synthetic no-show prediction API.
+- `backend/clinic_faq/` — approved fictional policy ingestion, local embeddings, retrieval, and FAQ assistant.
+- `backend/ml_dashboard/` — authenticated read-only access to the existing Week 4 ML reports.
 - `backend/ml/` — synthetic dataset generation, EDA, training, and evaluation scripts.
 - `backend/` — Django project and pinned Python dependencies.
 - `backend/.venv/` — local Python virtual environment (not tracked by Git).
@@ -22,6 +24,8 @@ HealthProfile is a full-stack health-profile application with standard-user and 
 **Administrators** use a separate Django session and CSRF-protected login. Staff can search, filter, and paginate the profile directory, open a profile detail view, and deactivate or reactivate a profile. Successful status changes are audited. The status action changes only `HealthProfile.is_active`; it does not disable the Django user or delete profile data.
 
 **Week 3 prediction prototype** adds a No-Show Prediction section to the signed-in dashboard. It sends the supplied educational inputs through the same-origin Next.js proxy to Django's versioned prediction endpoint; it does not create or schedule appointments. Predictions come from a model trained on entirely synthetic records and are not clinical or real-world risk estimates. See [backend/ml/README.md](./backend/ml/README.md) for the dataset, methods, results, and reproducible commands.
+
+**Week 4 HealthProfile Intelligence** adds an authenticated dashboard for supervised validation metrics, synthetic engagement segmentation, a local policy assistant, and model-governance context. The ML workflows use separate synthetic datasets; approved fictional clinic policy files are the only FAQ knowledge sources. See [backend/ml/README.md](./backend/ml/README.md), [backend/clinic_faq/README.md](./backend/clinic_faq/README.md), and the [Week 4 submission checklist](./docs/week4-submission.md) for methodology, local setup, API references, limitations, and evidence requirements. The dashboard does not display feature-importance or error-analysis values; those remain separate reports.
 
 ## Prerequisites
 
@@ -141,22 +145,24 @@ commands if you need to preserve the current data and recorded results.
 diagnostics, and does not write output files. See the [ML documentation](./backend/ml/README.md)
 for EDA, cross-validation, learning-curve, and regularization commands.
 
-After training, configure trusted SHA-256 values for both files in the
-environment that runs Django. From the repository root, PowerShell can
-calculate the current digests:
+The prediction API verifies both Week 3 files against trusted SHA-256 values
+loaded from the repository-root `.env`. After first setup or intentional model
+replacement, explicitly refresh the local hashes from the actual files by
+running this command from `backend/`:
 
 ```powershell
-$env:NO_SHOW_MODEL_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.joblib -Algorithm SHA256).Hash.ToLowerInvariant()
-$env:NO_SHOW_MODEL_METADATA_SHA256 = (Get-FileHash backend\ml\artifacts\no_show_pipeline.metadata.json -Algorithm SHA256).Hash.ToLowerInvariant()
+.\.venv\Scripts\python.exe manage.py refresh_no_show_hashes
 ```
 
-Provide these expected values through a trusted deployment configuration,
-independently of the replaceable files. Recalculate and update them after
-authorized retraining. The API verifies both values before loading the model.
+This deliberate command atomically updates only the two digest entries in
+`.env`; it never runs during Django startup. Missing or changed artifacts
+continue to fail verification until an authorized developer runs the command.
+Keep `.env` local and uncommitted. `.env.example` contains placeholders only.
+For production, provide expected hashes through a trusted deployment
+configuration rather than this development `.env`.
 
 To serve the prediction endpoint, run Django with the integration environment
-(which includes ML and backend dependencies) in the same PowerShell session
-where the two digest variables are set:
+(which includes ML and backend dependencies):
 
 ```powershell
 Push-Location backend
@@ -365,6 +371,26 @@ The [Week 3 API and demo checklist](#week-3-prediction-api-and-demo-checklist)
 contains the request/response example, authentication and failure behavior.
 See the [API reference](./docs/api-authentication.md) for the full contract.
 
+## Week 4 HealthProfile Intelligence
+
+The signed-in standard-user dashboard contains Overview, Predictive Analytics,
+Engagement Segmentation, Clinic Assistant, and Model Governance sections.
+Its report data is served by authenticated `GET /api/v1/ml-dashboard/` and
+proxied by the same-origin Next.js route `/api/ml-dashboard/`. The Clinic
+Assistant uses `POST /api/v1/clinic-faq/ask/` through `/api/clinic-faq/ask/`;
+it retrieves only approved fictional policies and uses the configured local
+Ollama model. These routes do not provide clinical advice or access profile
+records for the FAQ workflow.
+
+The detailed [ML documentation](./backend/ml/README.md) covers synthetic
+supervised and clustering workflows, reports, and reproducibility. The
+[Clinic FAQ documentation](./backend/clinic_faq/README.md) documents policy
+ingestion, local embeddings, retrieval, grounded responses, and the 12-question
+evaluation. See the [API and authentication reference](./docs/api-authentication.md)
+for exact route and error contracts. The dashboard requires a standard-user
+session and the local FAQ service requires approved policies and embeddings,
+as well as Ollama running locally.
+
 ## Verify
 
 ```powershell
@@ -381,6 +407,11 @@ Pop-Location
 
 Push-Location frontend
 npm run lint
+npx tsc --noEmit
 npm run build
 Pop-Location
 ```
+
+Week 4-focused test commands and the manual screenshot/video checklist are in
+the [submission guide](./docs/week4-submission.md). The guide records known
+evidence gaps; no screenshots or Loom recording are included in this repository.

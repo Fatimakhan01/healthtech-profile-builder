@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'profiles.apps.ProfilesConfig',
     'predictions.apps.PredictionsConfig',
+    'clinic_faq.apps.ClinicFAQConfig',
+    'workflows.apps.WorkflowsConfig',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -34,6 +36,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'accounts.permissions.IsStandardUser',
     ],
+    'DEFAULT_THROTTLE_RATES': {
+        'clinic_faq': '10/hour',
+    },
 }
 
 SESSION_COOKIE_HTTPONLY = True

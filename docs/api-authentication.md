@@ -122,6 +122,130 @@ is learned from artificial labels and is not a calibrated or clinically
 validated real-world risk estimate. Do not use it to make clinical or
 appointment decisions.
 
+## Fictional clinic policy FAQ assistant
+
+The Clinic Assistant uses the same-origin Next.js route handler at
+`frontend/src/app/api/clinic-faq/ask/route.ts` to proxy requests to Django:
+
+| Method and route | Purpose | Authentication |
+|---|---|---|
+| `POST /api/clinic-faq/ask/` (browser) → `POST /api/v1/clinic-faq/ask/` (Django) | Return an answer grounded in approved fictional clinic-policy passages. | Authenticated standard user. |
+
+The browser proxy forwards the access bearer token and relevant session
+cookies. The Django view requires `IsAuthenticated` and `IsStandardUser`, and
+applies a scoped limit of 10 requests per user per hour. Request JSON must
+contain only a `question` string of 1–1,000 non-whitespace characters:
+
+```http
+POST /api/clinic-faq/ask/
+Authorization: Bearer <standard-user-access-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "question": "How can someone request an appointment?"
+}
+```
+
+The API retrieves only current chunks from the four approved documents in
+`backend/clinic_faq/policies/approved/`, embeds the query with the configured
+local Sentence Transformers model, and sends the question and retrieved
+passages to loopback-only Ollama. With no relevant passages it abstains without
+calling Ollama. Answers use the validated response shape
+`answer` (string), `insufficient_information` (boolean), and `citations`
+(array of `{title, filename}` objects). Citations are selected from retrieved
+approved sources. Questions and passages are treated as untrusted data by the
+prompt. The conservative sensitive-content guard runs before the provider
+call, but is not guaranteed PII detection; do not submit patient details or
+health-profile information. The FAQ workflow does not access profile records.
+
+Example response captured in the checked-in evaluation report for this
+question (a later local-model response can differ):
+
+```json
+{
+  "answer": "Contact the fictional scheduling desk or use the fictional online booking page to request an appointment.",
+  "insufficient_information": false,
+  "citations": [
+    {
+      "title": "Synthetic Example — Appointment Scheduling",
+      "filename": "appointment-scheduling.md"
+    },
+    {
+      "title": "Synthetic Example — Cancellations and Rescheduling",
+      "filename": "cancellations.md"
+    },
+    {
+      "title": "Synthetic Example — Appointment Reminders",
+      "filename": "reminders.md"
+    },
+    {
+      "title": "Synthetic Example — Late Arrivals",
+      "filename": "late-arrivals.md"
+    }
+  ]
+}
+```
+
+Invalid/missing/extra fields or input rejected by the sensitive-content guard
+return `400`; missing/invalid authentication returns `401`, and a user without
+the standard role receives `403`. Requests over the scoped limit return `429`.
+Missing local configuration returns `503`, provider timeout returns `504`,
+and provider failure or malformed output returns `502`, each with a generic
+`detail` response.
+
+The answer model settings are local environment values documented in
+[`backend/clinic_faq/README.md`](../backend/clinic_faq/README.md). The default
+chat model is `qwen2.5:1.5b-instruct` served by local Ollama; embeddings use
+Sentence Transformers locally and do not require an API key or paid service.
+
+## ML dashboard report API
+
+The signed-in dashboard requests the same-origin Next.js route handler in
+`frontend/src/app/api/ml-dashboard/route.ts`, which proxies to Django:
+
+| Method and route | Purpose | Authentication |
+|---|---|---|
+| `GET /api/ml-dashboard/` (browser) → `GET /api/v1/ml-dashboard/` (Django) | Return the existing supervised comparison, supervised metadata, and clustering report JSON. | Authenticated standard user. |
+
+Example request:
+
+```http
+GET /api/ml-dashboard/
+Authorization: Bearer <standard-user-access-token>
+```
+
+The `200` response is an object containing the full report JSON under
+`supervised`, `supervised_metadata`, and `clustering`. For example, these
+selected fields are from the current checked-in files; the actual response
+includes the rest of each report, including PCA coordinates:
+
+```json
+{
+  "supervised": {
+    "selected_model": "LogisticRegression",
+    "split_strategy": "Stratified 70% train, 15% validation, 15% test"
+  },
+  "supervised_metadata": {
+    "model_name": "LogisticRegression",
+    "model_version": "week4-supervised-fbeb2aae94b06a9639befb86a901dcf693a82f2d059d63c1161eaf2637601500"
+  },
+  "clustering": {
+    "report_version": 1,
+    "random_seed": 42
+  }
+}
+```
+
+The response is read-only and returned with `Cache-Control: no-store`; it
+does not retrain models or calculate metrics. The feature-importance and
+error-analysis reports are not included in this API response, and their
+values are not displayed in the dashboard. Missing, unreadable, malformed, or
+non-object source reports produce `503` with a generic `detail` response.
+Missing/invalid authentication returns `401`; an authenticated non-standard
+user is denied with `403`.
+
 ## Standard-user health profile API
 
 The authenticated Django endpoint `POST /api/profiles/me/` creates or recreates a profile for the current standard user. Send the normal profile fields, including required `full_name`; success returns `201` with the created profile. If the user already has a profile, it returns `409` without changing it. `DELETE /api/profiles/me/` deletes only the current user's profile and returns `204`; it does not delete the user account. If a profile is absent, `GET`, `PATCH`, and `DELETE` return `404`.

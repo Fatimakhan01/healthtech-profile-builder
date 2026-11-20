@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import MLDashboard from "./MLDashboard";
 import NoShowPrediction from "./NoShowPrediction";
 
 type AuthUser = {
@@ -68,6 +69,7 @@ export default function ProfileDashboard({
   onSessionExpired,
   refreshAccessToken,
 }: Props) {
+  const [activeView, setActiveView] = useState<"profile" | "ml">("profile");
   const [profile, setProfile] = useState<HealthProfile>(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [profileExists, setProfileExists] = useState(false);
@@ -319,6 +321,30 @@ export default function ProfileDashboard({
           </button>
         </header>
 
+        <nav
+          aria-label="Dashboard sections"
+          className="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2"
+        >
+          <button
+            aria-current={activeView === "profile" ? "page" : undefined}
+            className={`min-h-10 shrink-0 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 ${activeView === "profile" ? "bg-teal-800 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+            onClick={() => setActiveView("profile")}
+            type="button"
+          >
+            My profile
+          </button>
+          <button
+            aria-current={activeView === "ml" ? "page" : undefined}
+            className={`min-h-10 shrink-0 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 ${activeView === "ml" ? "bg-teal-800 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+            onClick={() => setActiveView("ml")}
+            type="button"
+          >
+            HealthProfile Intelligence
+          </button>
+        </nav>
+
+        {activeView === "profile" ? (
+          <>
         <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-40px_rgba(15,57,61,0.35)]">
           <div className="border-b border-slate-100 bg-gradient-to-r from-teal-50/80 via-white to-white px-5 py-5 sm:px-8">
             <p className="text-xs font-semibold uppercase tracking-[0.17em] text-teal-800">Your details</p>
@@ -553,6 +579,14 @@ export default function ProfileDashboard({
           onSessionExpired={onSessionExpired}
           refreshAccessToken={refreshAccessToken}
         />
+          </>
+        ) : (
+          <MLDashboard
+            accessToken={accessToken}
+            onSessionExpired={onSessionExpired}
+            refreshAccessToken={refreshAccessToken}
+          />
+        )}
       </div>
     </main>
   );

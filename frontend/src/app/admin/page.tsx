@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import WorkflowAudit from "../../components/WorkflowAudit";
 
 type AdminUser = {
   id: number;
@@ -658,6 +659,7 @@ export default function AdminPage() {
           </footer>
           </div>
         </section>
+        <WorkflowAudit />
       </div>
       {selectedProfile && (
         <div

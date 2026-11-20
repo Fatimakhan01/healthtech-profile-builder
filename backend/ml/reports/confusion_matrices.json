@@ -1,0 +1,153 @@
+{
+  "LogisticRegression": {
+    "training": [
+      [
+        627,
+        373
+      ],
+      [
+        143,
+        257
+      ]
+    ],
+    "validation": [
+      [
+        141,
+        74
+      ],
+      [
+        33,
+        52
+      ]
+    ],
+    "matrix_order": {
+      "rows": [
+        "actual_0_attended",
+        "actual_1_no_show"
+      ],
+      "columns": [
+        "predicted_0_attended",
+        "predicted_1_no_show"
+      ]
+    }
+  },
+  "RandomForestClassifier": {
+    "training": [
+      [
+        1000,
+        0
+      ],
+      [
+        0,
+        400
+      ]
+    ],
+    "validation": [
+      [
+        206,
+        9
+      ],
+      [
+        72,
+        13
+      ]
+    ],
+    "matrix_order": {
+      "rows": [
+        "actual_0_attended",
+        "actual_1_no_show"
+      ],
+      "columns": [
+        "predicted_0_attended",
+        "predicted_1_no_show"
+      ]
+    }
+  },
+  "GradientBoostingClassifier": {
+    "training": [
+      [
+        983,
+        17
+      ],
+      [
+        243,
+        157
+      ]
+    ],
+    "validation": [
+      [
+        205,
+        10
+      ],
+      [
+        73,
+        12
+      ]
+    ],
+    "matrix_order": {
+      "rows": [
+        "actual_0_attended",
+        "actual_1_no_show"
+      ],
+      "columns": [
+        "predicted_0_attended",
+        "predicted_1_no_show"
+      ]
+    }
+  },
+  "TunedRandomForestClassifier": {
+    "training": [
+      [
+        936,
+        64
+      ],
+      [
+        52,
+        348
+      ]
+    ],
+    "validation": [
+      [
+        182,
+        33
+      ],
+      [
+        55,
+        30
+      ]
+    ],
+    "matrix_order": {
+      "rows": [
+        "actual_0_attended",
+        "actual_1_no_show"
+      ],
+      "columns": [
+        "predicted_0_attended",
+        "predicted_1_no_show"
+      ]
+    }
+  },
+  "selected_final_model": {
+    "name": "LogisticRegression",
+    "test": [
+      [
+        144,
+        70
+      ],
+      [
+        42,
+        44
+      ]
+    ],
+    "matrix_order": {
+      "rows": [
+        "actual_0_attended",
+        "actual_1_no_show"
+      ],
+      "columns": [
+        "predicted_0_attended",
+        "predicted_1_no_show"
+      ]
+    }
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "dataset_version": 1,
+  "description": "Answerable retrieval questions grounded in the four fictional approved clinic policy examples.",
+  "questions": [
+    {
+      "id": "appointment-request-methods",
+      "question": "How can I request an appointment?",
+      "expected_sources": ["appointment-scheduling.md"],
+      "evidence": {
+        "appointment-scheduling.md": "may be requested by contacting the fictional scheduling desk or by using the fictional online booking page"
+      }
+    },
+    {
+      "id": "appointment-requested-time-confirmation",
+      "question": "When is an appointment time I requested confirmed?",
+      "expected_sources": ["appointment-scheduling.md"],
+      "evidence": {
+        "appointment-scheduling.md": "Requested times are not confirmed until the fictional clinic sends a confirmation."
+      }
+    },
+    {
+      "id": "appointment-confirmation-details",
+      "question": "Which details should I verify in the appointment confirmation?",
+      "expected_sources": ["appointment-scheduling.md"],
+      "evidence": {
+        "appointment-scheduling.md": "Please check the confirmation for the appointment date, time, and location."
+      }
+    },
+    {
+      "id": "appointment-incorrect-confirmation",
+      "question": "What should I do if the appointment confirmation is incorrect?",
+      "expected_sources": ["appointment-scheduling.md"],
+      "evidence": {
+        "appointment-scheduling.md": "If the confirmation appears incorrect, contact the fictional scheduling desk before the appointment."
+      }
+    },
+    {
+      "id": "appointment-online-request",
+      "question": "Can I request an appointment through the online booking page?",
+      "expected_sources": ["appointment-scheduling.md"],
+      "evidence": {
+        "appointment-scheduling.md": "may be requested by contacting the fictional scheduling desk or by using the fictional online booking page"
+      }
+    },
+    {
+      "id": "cancellation-contact",
+      "question": "Who should I contact to cancel or change an appointment?",
+      "expected_sources": ["cancellations.md"],
+      "evidence": {
+        "cancellations.md": "may contact the fictional scheduling desk"
+      }
+    },
+    {
+      "id": "online-booking-change-request",
+      "question": "If I used the online booking page, where might I request an appointment change?",
+      "expected_sources": ["cancellations.md"],
+      "evidence": {
+        "cancellations.md": "the fictional page may also provide a way to request a change"
+      }
+    },
+    {
+      "id": "cancellation-recording-confirmation",
+      "question": "How will I know whether my cancellation or new time was recorded?",
+      "expected_sources": ["cancellations.md"],
+      "evidence": {
+        "cancellations.md": "will confirm whether the cancellation or new time has been recorded"
+      }
+    },
+    {
+      "id": "change-completion",
+      "question": "When should I consider a requested appointment change complete?",
+      "expected_sources": ["cancellations.md"],
+      "evidence": {
+        "cancellations.md": "should not be considered complete until confirmation is received"
+      }
+    },
+    {
+      "id": "cancellation-wait-for-confirmation",
+      "question": "What should I wait for before treating a requested cancellation as complete?",
+      "expected_sources": ["cancellations.md"],
+      "evidence": {
+        "cancellations.md": "should not be considered complete until confirmation is received"
+      }
+    },
+    {
+      "id": "late-arrival-contact",
+      "question": "What should I do if I expect to arrive late?",
+      "expected_sources": ["late-arrivals.md"],
+      "evidence": {
+        "late-arrivals.md": "may contact the fictional scheduling desk as soon as practical"
+      }
+    },
+    {
+      "id": "late-arrival-contact-timing",
+      "question": "How soon should I contact the scheduling desk when I am running behind?",
+      "expected_sources": ["late-arrivals.md"],
+      "evidence": {
+        "late-arrivals.md": "as soon as practical"
+      }
+    },
+    {
+      "id": "late-arrival-staff-guidance",
+      "question": "Who can explain whether a late appointment can still be accommodated?",
+      "expected_sources": ["late-arrivals.md"],
+      "evidence": {
+        "late-arrivals.md": "Staff can explain whether the appointment can still be accommodated"
+      }
+    },
+    {
+      "id": "late-arrival-rescheduling",
+      "question": "What might staff suggest if a late appointment cannot be accommodated?",
+      "expected_sources": ["late-arrivals.md"],
+      "evidence": {
+        "late-arrivals.md": "or needs to be rescheduled"
+      }
+    },
+    {
+      "id": "late-arrival-availability",
+      "question": "What may affect whether a late arrival can be accommodated?",
+      "expected_sources": ["late-arrivals.md"],
+      "evidence": {
+        "late-arrivals.md": "Availability may depend on the fictional schedule."
+      }
+    },
+    {
+      "id": "reminder-contact-method",
+      "question": "How may I receive an appointment reminder?",
+      "expected_sources": ["reminders.md"],
+      "evidence": {
+        "reminders.md": "may be sent using the contact method selected for a fictional booking"
+      }
+    },
+    {
+      "id": "reminder-selected-channel",
+      "question": "What determines the contact method used for an appointment reminder?",
+      "expected_sources": ["reminders.md"],
+      "evidence": {
+        "reminders.md": "the contact method selected for a fictional booking"
+      }
+    },
+    {
+      "id": "reminder-not-substitute",
+      "question": "Does an appointment reminder replace checking the appointment confirmation?",
+      "expected_sources": ["reminders.md"],
+      "evidence": {
+        "reminders.md": "A reminder is a courtesy and does not replace checking the appointment confirmation."
+      }
+    },
+    {
+      "id": "missing-reminder-actions",
+      "question": "What should I do if I do not receive an appointment reminder?",
+      "expected_sources": ["reminders.md"],
+      "evidence": {
+        "reminders.md": "may check the fictional online booking page or contact the fictional scheduling desk to confirm the appointment details"
+      }
+    },
+    {
+      "id": "missing-reminder-confirm-details",
+      "question": "Where can I confirm my appointment details if a reminder does not arrive?",
+      "expected_sources": ["reminders.md"],
+      "evidence": {
+        "reminders.md": "check the fictional online booking page or contact the fictional scheduling desk to confirm the appointment details"
+      }
+    }
+  ]
+}

@@ -11,7 +11,10 @@ type AuthEndpoint =
   | "admin-session"
   | "admin-profiles"
   | "admin-profile-status"
-  | "no-show-prediction";
+  | "admin-workflow-jobs"
+  | "no-show-prediction"
+  | "clinic-faq"
+  | "ml-dashboard";
 
 const SESSION_COOKIE_NAMES = new Set(["sessionid", "csrftoken"]);
 
@@ -42,6 +45,8 @@ export async function proxyAuthRequest(
     endpoint === "me" ||
     endpoint === "profile" ||
     endpoint === "no-show-prediction" ||
+    endpoint === "clinic-faq" ||
+    endpoint === "ml-dashboard" ||
     endpoint === "session-refresh" ||
     endpoint === "session-logout"
   ) {
@@ -60,7 +65,10 @@ export async function proxyAuthRequest(
     "admin-session",
     "admin-profiles",
     "admin-profile-status",
+    "admin-workflow-jobs",
     "no-show-prediction",
+    "clinic-faq",
+    "ml-dashboard",
   ];
   const cookies = sessionEndpoints.includes(endpoint)
     ? getForwardedCookies(request.headers.get("cookie"))
@@ -97,7 +105,10 @@ export async function proxyAuthRequest(
       "admin-session": "/admin/session/",
       "admin-profiles": "/admin/profiles/",
       "admin-profile-status": "/admin/profiles/",
+      "admin-workflow-jobs": "/admin/workflows/jobs/",
       "no-show-prediction": "/v1/predictions/no-show/",
+      "clinic-faq": "/v1/clinic-faq/ask/",
+      "ml-dashboard": "/v1/ml-dashboard/",
     };
     const upstreamPath =
       endpoint === "admin-profile-status"
@@ -110,8 +121,12 @@ export async function proxyAuthRequest(
       );
     }
     const upstreamUrl = new URL(`${backendUrl}${upstreamPath}`);
-    if (endpoint === "admin-profiles") {
-      for (const parameter of ["search", "active", "page", "page_size"]) {
+    if (endpoint === "admin-profiles" || endpoint === "admin-workflow-jobs") {
+      const parameters =
+        endpoint === "admin-profiles"
+          ? ["search", "active", "page", "page_size"]
+          : ["page", "page_size"];
+      for (const parameter of parameters) {
         const value = new URL(request.url).searchParams.get(parameter);
         if (value !== null) {
           upstreamUrl.searchParams.set(parameter, value);
@@ -143,7 +158,11 @@ export async function proxyAuthRequest(
         detail:
           endpoint === "no-show-prediction"
             ? "The prediction service is unavailable."
-            : "The authentication service is unavailable.",
+            : endpoint === "clinic-faq"
+              ? "The FAQ assistant is unavailable."
+              : endpoint === "ml-dashboard"
+                ? "The ML dashboard is unavailable."
+              : "The authentication service is unavailable.",
       },
       { status: 502, headers: { "cache-control": "no-store" } },
     );
